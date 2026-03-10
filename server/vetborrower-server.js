@@ -15,13 +15,23 @@
  */
 import express from 'express';
 import path from 'path';
+import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+import { OutputConsoleMessage, OutputConsoleErrorMessage } from './utils.js';
 
 const app = express();
 const PORT = 9195;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * Get the flag that indicates we are in the test environment
+ */
+dotenv.config({ path: resolve(__dirname, '../.env'), quiet: true });
+const isTestEnvironment = process.env.VITE_ENV_IS_TEST_ENV?.toLocaleLowerCase() === "true";
+OutputConsoleMessage(`System is running in ${isTestEnvironment ? 'TEST' : 'LIVE'} environment`);
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'dist')));
@@ -32,7 +42,7 @@ app.get('*path', (req, res) => {
 });
 
 const server = app.listen(PORT, '127.0.0.1', () => {
-  console.log(`Server is running on port ${PORT}`);
+  OutputConsoleMessage(`Server is running on port ${PORT}`);
 });
 
 // Graceful shutdown
@@ -45,17 +55,17 @@ async function shutdown() {
   isShuttingDown = true;
 
   try {
-    console.log('Shutting down server...');
+    OutputConsoleMessage('Shutting down server...');
     await new Promise((resolve, reject) => {
       server.close((err) => {
         if (err) reject(err);
         else resolve(null);
       });
     });
-    console.log('Server closed.');
+    OutputConsoleMessage('Server closed.');
     process.exit(0);
   } catch (error) {
-    console.error('Error during shutdown:', error);
+    OutputConsoleErrorMessage('Error during shutdown:', error);
     process.exit(1);
   }
 }
