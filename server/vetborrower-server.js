@@ -24,12 +24,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 app.use(express.json());
-//app.use(express.static(path.join(__dirname, 'dist')));
-app.use(express.static(path.join(__dirname, '..', 'dist')));
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // Serve React App for all other routes
 app.get('*path', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 const server = app.listen(PORT, '127.0.0.1', () => {

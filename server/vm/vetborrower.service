@@ -33,7 +33,7 @@ ExecStartPre=/usr/local/bin/vetborrower-rotate-logs.sh
 # Run the JS file that lives WITH its node_modules context
 # To figure out the node version use something like:
 #    ls /home/vetborrower/.nvm/versions/node
-ExecStart=/bin/bash -lc 'exec /usr/local/bin/getNodeVersion.sh ./vb-server.js >> /var/log/vetborrower/vetborrower-server_stdout.log 2>> /var/log/vetborrower/vetborrower-server_stderr.log'
+ExecStart=/bin/bash -lc 'exec /usr/local/bin/getNodeVersion.sh ./vetborrower-server.js >> /var/log/vetborrower/vetborrower-server_stdout.log 2>> /var/log/vetborrower/vetborrower-server_stderr.log'
 
 Restart=on-failure
 RestartSec=10

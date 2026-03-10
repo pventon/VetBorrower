@@ -18,7 +18,7 @@ Description=Node.js vetborrower-Server
 After=network.target
 
 [Service]
-ExecStart=/home/vetborrower/VetBorrower/server/vetborrower-server-start.sh /home/vetborrower/VetBorrower/server/vb-server.js
+ExecStart=/home/vetborrower/VetBorrower/server/vetborrower-server-start.sh /home/vetborrower/VetBorrower/server/vetborrower-server.js
 WorkingDirectory=/home/vetborrower/VetBorrower/server
 Restart=always
 User=vetborrower
