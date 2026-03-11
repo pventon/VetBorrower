@@ -12,21 +12,53 @@
  * without the prior written permission of the copyright holder, nor
  * shall it be used for any purpose other than in connection with an
  * agreement or proposed agreement with Ventec SW LLC.
- */ 
+ */
 
-//import { useState } from 'react'
-
+import { useState } from "react";
 import "./App.css";
+import { useAuth } from "./context/AuthContext";
+import Login from "./components/Login";
+import MenuBar from "./components/MenuBar";
+import UserAccountsDialog from "./components/UserAccountsDialog";
+import SystemSettingsDialog from "./components/SystemSettingsDialog";
 
 function App() {
+    const { isAuthenticated, isLoading, user, logout } = useAuth();
+    const [showUserAccounts, setShowUserAccounts] = useState(false);
+    const [showSystemSettings, setShowSystemSettings] = useState(false);
+
+    if (isLoading) {
+        return <div className="loading">Loading...</div>;
+    }
+
+    if (!isAuthenticated) {
+        return <Login />;
+    }
+
     return (
-        <>
-            <div>
-                <p className="read-the-docs">
-                    Vet Borrower Web site is under construction V4
-                </p>
-            </div>
-        </>
+        <div className="app-container">
+            <header className="app-header">
+                <h1>VetBorrower</h1>
+                <div className="user-info">
+                    <span>{user?.firstName} {user?.lastName} ({user?.role})</span>
+                    <button onClick={logout}>Sign Out</button>
+                </div>
+            </header>
+            <MenuBar
+                onUserAccounts={() => setShowUserAccounts(true)}
+                onSystemSettings={() => setShowSystemSettings(true)}
+            />
+            <main>
+                <p>Welcome to VetBorrower - Under Construction</p>
+            </main>
+
+            {showUserAccounts && (
+                <UserAccountsDialog onClose={() => setShowUserAccounts(false)} />
+            )}
+            {showSystemSettings && (
+                <SystemSettingsDialog onClose={() => setShowSystemSettings(false)} />
+            )}
+        </div>
     );
 }
 

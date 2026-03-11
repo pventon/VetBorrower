@@ -1,0 +1,312 @@
+================================================================================
+VetBorrower API - curl test statements
+Base URL: http://127.0.0.1:9195
+================================================================================
+
+
+================================================================================
+CORPORATION
+================================================================================
+
+# Get all corporations
+curl http://127.0.0.1:9195/api/corporation
+
+# Get corporation by ID (replace <ID> with actual MongoDB _id)
+curl http://127.0.0.1:9195/api/corporation/<ID>
+
+# Add a corporation
+curl -X POST http://127.0.0.1:9195/api/corporation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "businessName": "Test Corp",
+    "dbaName": "Test DBA",
+    "ownerDetails": [{
+      "ownerName": ["John Doe"],
+      "ownerPhone": ["555-123-4567"],
+      "ownerEmail": ["john@testcorp.com"]
+    }],
+    "percentOfOwnership": 100,
+    "businessAddress": {
+      "streetName": "123 Main St",
+      "city": "Dallas",
+      "state": "TX",
+      "zip": "75201"
+    },
+    "homeAddress": {
+      "streetName": "456 Oak Ave",
+      "city": "Dallas",
+      "state": "TX",
+      "zip": "75202"
+    },
+    "timeInBusiness": 5,
+    "lengthOfOwnership": 3,
+    "dob": "1980-01-15",
+    "ficoScore": 720,
+    "ethnicity": "Caucasian",
+    "stateOfTheBusiness": "TX",
+    "industryType": "Retail",
+    "deals": []
+  }'
+
+# Update a corporation (replace <ID> with actual MongoDB _id)
+curl -X PUT http://127.0.0.1:9195/api/corporation/<ID> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "businessName": "Updated Corp Name",
+    "ficoScore": 750
+  }'
+
+# Delete a corporation (replace <ID> with actual MongoDB _id)
+curl -X DELETE http://127.0.0.1:9195/api/corporation/<ID>
+
+
+================================================================================
+DEAL
+================================================================================
+
+# Get all deals
+curl http://127.0.0.1:9195/api/deal
+
+# Get deal by ID (replace <ID> with actual MongoDB _id)
+curl http://127.0.0.1:9195/api/deal/<ID>
+
+# Add a deal
+curl -X POST http://127.0.0.1:9195/api/deal \
+  -H "Content-Type: application/json" \
+  -d '{
+    "referringIso": "ISO-001",
+    "typeOfDeal": "new",
+    "position": "1st",
+    "fundingDate": "2026-03-10",
+    "fundingAmount": 50000,
+    "netFundedAmount": 47500,
+    "originationFee": 2500,
+    "loanTerm": 180,
+    "weeklyOrDailyPayment": true,
+    "paymentAmount": 350,
+    "buyRate": 1.25,
+    "factorRate": 1.35,
+    "mcaHistory": "None"
+  }'
+
+# Update a deal (replace <ID> with actual MongoDB _id)
+curl -X PUT http://127.0.0.1:9195/api/deal/<ID> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fundingAmount": 55000,
+    "netFundedAmount": 52250
+  }'
+
+# Delete a deal (replace <ID> with actual MongoDB _id)
+curl -X DELETE http://127.0.0.1:9195/api/deal/<ID>
+
+
+================================================================================
+BROKER
+================================================================================
+
+# Get all brokers
+curl http://127.0.0.1:9195/api/broker
+
+# Get broker by ID (replace <ID> with actual MongoDB _id)
+curl http://127.0.0.1:9195/api/broker/<ID>
+
+# Add a broker
+curl -X POST http://127.0.0.1:9195/api/broker \
+  -H "Content-Type: application/json" \
+  -d '{
+    "brokerName": "ABC Brokerage",
+    "numberOfSubmissions": 0,
+    "numberOfDeclines": 0,
+    "numberOfApprovals": 0,
+    "numberOfFundedDeals": 0,
+    "totalDollarAmountFunded": 0,
+    "totalDollarAmountOfDefaults": 0,
+    "totalCommissionAmount": 0
+  }'
+
+# Update a broker (replace <ID> with actual MongoDB _id)
+curl -X PUT http://127.0.0.1:9195/api/broker/<ID> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "numberOfSubmissions": 10,
+    "numberOfApprovals": 7,
+    "numberOfFundedDeals": 5
+  }'
+
+# Delete a broker (replace <ID> with actual MongoDB _id)
+curl -X DELETE http://127.0.0.1:9195/api/broker/<ID>
+
+
+================================================================================
+SETTINGS
+================================================================================
+
+# Get settings
+curl http://127.0.0.1:9195/api/settings
+
+# Add settings
+curl -X POST http://127.0.0.1:9195/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "guiPaginationValues": [20, 25, 50, 100, 200, 500, 1000],
+    "serverPort": 9195,
+    "rateLimitPerSecond": 50,
+    "industryTypes": [
+      { "type": "Retail", "sic": 5999 },
+      { "type": "Restaurant", "sic": 5812 },
+      { "type": "Construction", "sic": 1522 },
+      { "type": "Transportation", "sic": 4210 },
+      { "type": "Healthcare", "sic": 8099 },
+      { "type": "Manufacturing", "sic": 3999 },
+      { "type": "Auto Repair", "sic": 7538 },
+      { "type": "Beauty Salon", "sic": 7231 },
+      { "type": "Gas Station", "sic": 5541 },
+      { "type": "Grocery Store", "sic": 5411 },
+      { "type": "Hotel/Motel", "sic": 7011 },
+      { "type": "Laundry/Dry Cleaning", "sic": 7211 },
+      { "type": "Legal Services", "sic": 8111 },
+      { "type": "Real Estate", "sic": 6512 },
+      { "type": "Trucking", "sic": 4213 },
+      { "type": "Wholesale Trade", "sic": 5199 }
+    ],
+    "usStates": [
+      { "acronym": "AL", "fullname": "Alabama" },
+      { "acronym": "AK", "fullname": "Alaska" },
+      { "acronym": "AZ", "fullname": "Arizona" },
+      { "acronym": "AR", "fullname": "Arkansas" },
+      { "acronym": "CA", "fullname": "California" },
+      { "acronym": "CO", "fullname": "Colorado" },
+      { "acronym": "CT", "fullname": "Connecticut" },
+      { "acronym": "DE", "fullname": "Delaware" },
+      { "acronym": "FL", "fullname": "Florida" },
+      { "acronym": "GA", "fullname": "Georgia" },
+      { "acronym": "HI", "fullname": "Hawaii" },
+      { "acronym": "ID", "fullname": "Idaho" },
+      { "acronym": "IL", "fullname": "Illinois" },
+      { "acronym": "IN", "fullname": "Indiana" },
+      { "acronym": "IA", "fullname": "Iowa" },
+      { "acronym": "KS", "fullname": "Kansas" },
+      { "acronym": "KY", "fullname": "Kentucky" },
+      { "acronym": "LA", "fullname": "Louisiana" },
+      { "acronym": "ME", "fullname": "Maine" },
+      { "acronym": "MD", "fullname": "Maryland" },
+      { "acronym": "MA", "fullname": "Massachusetts" },
+      { "acronym": "MI", "fullname": "Michigan" },
+      { "acronym": "MN", "fullname": "Minnesota" },
+      { "acronym": "MS", "fullname": "Mississippi" },
+      { "acronym": "MO", "fullname": "Missouri" },
+      { "acronym": "MT", "fullname": "Montana" },
+      { "acronym": "NE", "fullname": "Nebraska" },
+      { "acronym": "NV", "fullname": "Nevada" },
+      { "acronym": "NH", "fullname": "New Hampshire" },
+      { "acronym": "NJ", "fullname": "New Jersey" },
+      { "acronym": "NM", "fullname": "New Mexico" },
+      { "acronym": "NY", "fullname": "New York" },
+      { "acronym": "NC", "fullname": "North Carolina" },
+      { "acronym": "ND", "fullname": "North Dakota" },
+      { "acronym": "OH", "fullname": "Ohio" },
+      { "acronym": "OK", "fullname": "Oklahoma" },
+      { "acronym": "OR", "fullname": "Oregon" },
+      { "acronym": "PA", "fullname": "Pennsylvania" },
+      { "acronym": "RI", "fullname": "Rhode Island" },
+      { "acronym": "SC", "fullname": "South Carolina" },
+      { "acronym": "SD", "fullname": "South Dakota" },
+      { "acronym": "TN", "fullname": "Tennessee" },
+      { "acronym": "TX", "fullname": "Texas" },
+      { "acronym": "UT", "fullname": "Utah" },
+      { "acronym": "VT", "fullname": "Vermont" },
+      { "acronym": "VA", "fullname": "Virginia" },
+      { "acronym": "WA", "fullname": "Washington" },
+      { "acronym": "WV", "fullname": "West Virginia" },
+      { "acronym": "WI", "fullname": "Wisconsin" },
+      { "acronym": "WY", "fullname": "Wyoming" },
+      { "acronym": "DC", "fullname": "District of Columbia" }
+    ],
+    "userRoles": [
+      { "role": "admin", "description": "Full system access, can manage users and all settings" },
+      { "role": "manager", "description": "Can view and edit corporations, deals, and brokers" },
+      { "role": "user", "description": "Read-only access to corporations and deals" }
+    ],
+    "dateRecordCreated": "2026-03-10",
+    "dateRecordLastUpdated": "2026-03-10"
+  }'
+
+# Update settings (replace <ID> with actual MongoDB _id)
+curl -X PUT http://127.0.0.1:9195/api/settings/69b0be36c48a03f03728c785 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userRoles": [
+      { "role": "admin", "description": "Full system access, can manage users and all settings" },
+      { "role": "manager", "description": "Can view and edit corporations, deals, and brokers" },
+      { "role": "user", "description": "Read-only access to corporations and deals" }
+    ]
+  }'
+
+# Delete settings (replace <ID> with actual MongoDB _id)
+curl -X DELETE http://127.0.0.1:9195/api/settings/69b0c396347ecb948df087f7
+
+
+================================================================================
+AUTHENTICATION
+================================================================================
+
+# Login (returns JWT token)
+curl -X POST http://127.0.0.1:9195/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@vetborrower.com",
+    "password": "Admin123!"
+  }'
+
+# Get current user profile (requires token)
+# Replace <TOKEN> with the token returned from login
+curl http://127.0.0.1:9195/api/auth/me \
+  -H "Authorization: Bearer <TOKEN>"
+
+
+================================================================================
+USER ACCOUNTS (admin only - requires token)
+================================================================================
+
+# Get all user accounts
+curl http://127.0.0.1:9195/api/useraccount \
+  -H "Authorization: Bearer <TOKEN>"
+
+# Get user account by ID
+curl http://127.0.0.1:9195/api/useraccount/<ID> \
+  -H "Authorization: Bearer <TOKEN>"
+
+# Add a user account
+curl -X POST http://127.0.0.1:9195/api/useraccount \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -d '{
+    "email": "user@vetborrower.com",
+    "password": "User123!",
+    "firstName": "John",
+    "lastName": "Doe",
+    "role": "user",
+    "isActive": true
+  }'
+
+# Update a user account (replace <ID>)
+curl -X PUT http://127.0.0.1:9195/api/useraccount/<ID> \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -d '{
+    "role": "manager",
+    "isActive": true
+  }'
+
+# Reset a user's password (replace <ID>)
+curl -X PUT http://127.0.0.1:9195/api/useraccount/<ID> \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -d '{
+    "password": "NewPassword123!"
+  }'
+
+# Delete a user account (replace <ID>)
+curl -X DELETE http://127.0.0.1:9195/api/useraccount/<ID> \
+  -H "Authorization: Bearer <TOKEN>"
