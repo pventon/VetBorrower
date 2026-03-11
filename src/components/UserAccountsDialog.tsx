@@ -33,10 +33,11 @@ interface UserFormData {
     firstName: string;
     lastName: string;
     role: string;
+    officeAcronym: string;
     isActive: boolean;
 }
 
-const DEFAULT_ADMIN_EMAIL = "admin@vetborrower.com";
+const DEFAULT_ADMIN_EMAIL = "root@vetborrower.com";
 
 const emptyForm: UserFormData = {
     email: "",
@@ -44,13 +45,15 @@ const emptyForm: UserFormData = {
     firstName: "",
     lastName: "",
     role: "user",
+    officeAcronym: "",
     isActive: true,
 };
 
 export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps) {
-    const { token } = useAuth();
+    const { token, hasRole } = useAuth();
     const { settings } = useSettings();
     const [users, setUsers] = useState<UserAccountRecord[]>([]);
+    const [officeAcronyms, setOfficeAcronyms] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<UserAccountRecord | null>(null);
     const [isAdding, setIsAdding] = useState(false);
@@ -73,9 +76,24 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
         }
     };
 
+    const fetchOfficeAcronyms = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/office/acronyms`, { headers });
+            if (res.ok) setOfficeAcronyms(await res.json());
+        } catch {
+            // non-fatal — office list just stays empty
+        }
+    };
+
     useEffect(() => {
         fetchUsers();
+        fetchOfficeAcronyms();
     }, []);
+
+    // Roles available in the dropdown — non-root users cannot see or assign 'root'
+    const availableRoles = settings?.userRoles?.filter(
+        (r) => hasRole("root") || r.role !== "root"
+    ) ?? [];
 
     const startAdd = () => {
         setEditingUser(null);
@@ -93,6 +111,7 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
             firstName: user.firstName,
             lastName: user.lastName,
             role: user.role,
+            officeAcronym: user.officeAcronym ?? "",
             isActive: user.isActive,
         });
         setFormError(null);
@@ -114,6 +133,11 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
 
         if (isAdding && !formData.password) {
             setFormError("Password is required for new accounts.");
+            return;
+        }
+
+        if (!formData.officeAcronym) {
+            setFormError("An office must be assigned.");
             return;
         }
 
@@ -189,6 +213,7 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
                                 <th>Email</th>
                                 <th>Name</th>
                                 <th>Role</th>
+                                <th>Office</th>
                                 <th>Active</th>
                                 <th>Actions</th>
                             </tr>
@@ -199,6 +224,7 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
                                     <td>{user.email}</td>
                                     <td>{user.firstName} {user.lastName}</td>
                                     <td>{user.role}</td>
+                                    <td>{user.officeAcronym}</td>
                                     <td>{user.isActive ? "Yes" : "No"}</td>
                                     <td className="action-cell">
                                         <button className="btn btn-sm" onClick={() => startEdit(user)} disabled={showForm}>Edit</button>
@@ -207,7 +233,7 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
                                 </tr>
                             ))}
                             {users.length === 0 && (
-                                <tr><td colSpan={5} className="empty-row">No user accounts found</td></tr>
+                                <tr><td colSpan={6} className="empty-row">No user accounts found</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -255,8 +281,20 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
                                     value={formData.role}
                                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                 >
-                                    {settings?.userRoles?.map((r) => (
+                                    {availableRoles.map((r) => (
                                         <option key={r.role} value={r.role}>{r.role}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-row">
+                                <label>Office</label>
+                                <select
+                                    value={formData.officeAcronym}
+                                    onChange={(e) => setFormData({ ...formData, officeAcronym: e.target.value })}
+                                >
+                                    <option value="">-- Select Office --</option>
+                                    {officeAcronyms.map((a) => (
+                                        <option key={a} value={a}>{a}</option>
                                     ))}
                                 </select>
                             </div>

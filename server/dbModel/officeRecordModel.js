@@ -15,23 +15,20 @@
  */
 import mongoose from 'mongoose';
 
-const brokerSchema = new mongoose.Schema({
+// Define the office schema
+const officeSchema = new mongoose.Schema({
+    officeName: String,         // Office name in plain text
+    officeAcronym: String,      // Office name as an acronym
+    address: String,            // Office address
+    email: String,              // Office Email
+    phone: String,              // Office phone number
+    officeTimezone: String,     // IANA timezone identifier for this office (e.g. "America/New_York")
 
-  brokerName: String,
-  officeAcronym: String,
-  numberOfSubmissions: Number,
-  numberOfDeclines: Number,
-  numberOfApprovals: Number,
-  numberOfFundedDeals: Number,
-  totalDollarAmountFunded: Number,
-  totalDollarAmountOfDefaults: Number,
-  totalCommissionAmount: Number
-
-}, {
-  collection: "brokers"              // Explicitly set the collection name
+    dateCreated: Date,          // Date this record was created
+    lastUpdated: Date,          // Date that this recored was last updated
 });
-  
-// Create the DB model based on the schema
-const BrokersModel = mongoose.model('Brokers', brokerSchema);
 
-export default BrokersModel;
+// Create the DB model based on the schema
+const OfficeModel = mongoose.model('Office', officeSchema);
+
+export default OfficeModel;

@@ -21,13 +21,14 @@ import {
   UpdateBroker,
   DeleteBroker
 } from '../dbAccessFunctions/brokerRecord.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Get all brokers
-router.get('/api/broker', async (req, res) => {
+// Get all brokers for the authenticated user's office
+router.get('/api/broker', authenticateToken, async (req, res) => {
   try {
-    const records = await GetAllBrokers();
+    const records = await GetAllBrokers(req.user.officeAcronym);
     res.json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -35,7 +36,7 @@ router.get('/api/broker', async (req, res) => {
 });
 
 // Get broker by ID
-router.get('/api/broker/:id', async (req, res) => {
+router.get('/api/broker/:id', authenticateToken, async (req, res) => {
   try {
     const record = await GetBrokerById(req.params.id);
     if (!record) return res.status(404).json({ error: 'Broker not found' });
@@ -45,10 +46,10 @@ router.get('/api/broker/:id', async (req, res) => {
   }
 });
 
-// Add a broker
-router.post('/api/broker', async (req, res) => {
+// Add a broker — silently inject the user's officeAcronym
+router.post('/api/broker', authenticateToken, async (req, res) => {
   try {
-    const record = await AddBroker(req.body);
+    const record = await AddBroker({ ...req.body, officeAcronym: req.user.officeAcronym });
     res.status(201).json(record);
   } catch (error) {
     res.status(500).json({ error: error.message });

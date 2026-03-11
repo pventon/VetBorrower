@@ -100,6 +100,17 @@
   color: white;
 }
 
+.app-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-title-logo {
+  height: 40px;
+  width: auto;
+}
+
 .app-header h1 {
   margin: 0;
   font-size: 1.25rem;
@@ -267,6 +278,10 @@ main {
 
 .dialog-wide {
   max-width: 850px;
+}
+
+.dialog-extra-wide {
+  max-width: 1100px;
 }
 
 .dialog-header {

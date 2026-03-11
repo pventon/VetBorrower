@@ -15,19 +15,23 @@
  */
 import express from 'express';
 import {
-  GetAllDeals,
+  GetDealsByCorporation,
   GetDealById,
   AddDeal,
   UpdateDeal,
   DeleteDeal
 } from '../dbAccessFunctions/dealRecord.js';
+import { AddDealToCorporation, RemoveDealFromCorporation } from '../dbAccessFunctions/corporationRecord.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Get all deals
-router.get('/api/deal', async (req, res) => {
+// Get deals for a corporation
+router.get('/api/deal', authenticateToken, async (req, res) => {
   try {
-    const records = await GetAllDeals();
+    const { corporationId } = req.query;
+    if (!corporationId) return res.status(400).json({ error: 'corporationId query parameter is required' });
+    const records = await GetDealsByCorporation(corporationId);
     res.json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -35,7 +39,7 @@ router.get('/api/deal', async (req, res) => {
 });
 
 // Get deal by ID
-router.get('/api/deal/:id', async (req, res) => {
+router.get('/api/deal/:id', authenticateToken, async (req, res) => {
   try {
     const record = await GetDealById(req.params.id);
     if (!record) return res.status(404).json({ error: 'Deal not found' });
@@ -45,10 +49,13 @@ router.get('/api/deal/:id', async (req, res) => {
   }
 });
 
-// Add a deal
-router.post('/api/deal', async (req, res) => {
+// Add a deal and link it to the corporation
+router.post('/api/deal', authenticateToken, async (req, res) => {
   try {
-    const record = await AddDeal(req.body);
+    const { corporationId, ...dealData } = req.body;
+    if (!corporationId) return res.status(400).json({ error: 'corporationId is required' });
+    const record = await AddDeal(dealData);
+    await AddDealToCorporation(corporationId, record._id);
     res.status(201).json(record);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -56,7 +63,7 @@ router.post('/api/deal', async (req, res) => {
 });
 
 // Update a deal
-router.put('/api/deal/:id', async (req, res) => {
+router.put('/api/deal/:id', authenticateToken, async (req, res) => {
   try {
     const record = await UpdateDeal(req.params.id, req.body);
     if (!record) return res.status(404).json({ error: 'Deal not found' });
@@ -66,11 +73,13 @@ router.put('/api/deal/:id', async (req, res) => {
   }
 });
 
-// Delete a deal
-router.delete('/api/deal/:id', async (req, res) => {
+// Delete a deal and unlink it from the corporation
+router.delete('/api/deal/:id', authenticateToken, async (req, res) => {
   try {
+    const { corporationId } = req.query;
     const record = await DeleteDeal(req.params.id);
     if (!record) return res.status(404).json({ error: 'Deal not found' });
+    if (corporationId) await RemoveDealFromCorporation(corporationId, req.params.id);
     res.json({ message: 'Deal deleted', record });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -31,6 +31,7 @@ import routeCorporationRecord from './routes/routeCorporationRecord.js';
 import routeDealRecord from './routes/routeDealRecord.js';
 import routeBroker from './routes/routeBroker.js';
 import routeSettings from './routes/routeSettings.js';
+import routeOffice from './routes/routeOffice.js';
 
 const app = express();
 
@@ -112,12 +113,12 @@ async function startServer() {
       password: process.env.DEFAULT_ADMIN_PASSWORD_HASH,
       firstName: process.env.DEFAULT_ADMIN_FIRST_NAME,
       lastName: process.env.DEFAULT_ADMIN_LAST_NAME,
-      role: 'admin',
+      role: 'root',
       isActive: true,
       dateRecordCreated: now,
       dateRecordLastUpdated: now,
     });
-    OutputConsoleMessage('Default admin account created:', process.env.DEFAULT_ADMIN_EMAIL);
+    OutputConsoleMessage('Default root account created:', process.env.DEFAULT_ADMIN_EMAIL);
   }
 
   /**
@@ -129,6 +130,7 @@ async function startServer() {
   app.use(routeDealRecord);
   app.use(routeBroker);
   app.use(routeSettings);
+  app.use(routeOffice);
 
   // Serve React App for all other routes
   app.get('*path', (req, res) => {

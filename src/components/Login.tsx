@@ -21,6 +21,7 @@ export default function Login() {
     const { login } = useAuth();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -29,7 +30,7 @@ export default function Login() {
         setError(null);
         setIsSubmitting(true);
 
-        const loginError = await login(email, password);
+        const loginError = await login(email, password, rememberMe);
         if (loginError) {
             setError(loginError);
         }
@@ -45,6 +46,7 @@ export default function Login() {
                         <label htmlFor="email">Email</label>
                         <input
                             id="email"
+                            name="email"
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
@@ -57,6 +59,7 @@ export default function Login() {
                         <label htmlFor="password">Password</label>
                         <input
                             id="password"
+                            name="password"
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
@@ -64,6 +67,17 @@ export default function Login() {
                             autoComplete="current-password"
                             disabled={isSubmitting}
                         />
+                    </div>
+                    <div className="form-group" style={{ flexDirection: "row", alignItems: "center", gap: "0.5rem" }}>
+                        <input
+                            id="rememberMe"
+                            type="checkbox"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            disabled={isSubmitting}
+                            style={{ width: "auto" }}
+                        />
+                        <label htmlFor="rememberMe" style={{ marginBottom: 0 }}>Remember me</label>
                     </div>
                     {error && <div className="login-error">{error}</div>}
                     <button type="submit" disabled={isSubmitting}>

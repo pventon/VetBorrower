@@ -23,7 +23,7 @@ const router = express.Router();
 // Login
 router.post('/api/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required.' });
@@ -49,9 +49,9 @@ router.post('/api/auth/login', async (req, res) => {
 
     // Generate JWT
     const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role, firstName: user.firstName, lastName: user.lastName },
+      { id: user._id, email: user.email, role: user.role, firstName: user.firstName, lastName: user.lastName, officeAcronym: user.officeAcronym ?? '' },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+      { expiresIn: rememberMe ? '30d' : (process.env.JWT_EXPIRES_IN || '8h') }
     );
 
     res.json({

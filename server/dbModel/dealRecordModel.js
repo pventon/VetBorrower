@@ -17,11 +17,14 @@ import mongoose from 'mongoose';
 
 const dealSchema = new mongoose.Schema({
     
+  broker: { type: mongoose.Schema.Types.ObjectId, ref: 'Brokers' },
   referringIso: String,
   typeOfDeal: String,             // new/renewal
   position: String,               // Number of lenders assigned 
-  fundingDate: Date,
-  fundingAmount: Number,
+  fundedDate: Date,
+  defaultDate: Date,
+  renewalDate: Date,
+  fundedAmount: Number,
   netFundedAmount: Number,
   originationFee: Number,
   loanTerm: Number,               // How many days
@@ -29,7 +32,8 @@ const dealSchema = new mongoose.Schema({
   paymentAmount: Number,
   buyRate: Number,
   factorRate: Number,
-  mcaHistory: String
+  mcaHistory: String,
+  brokerFee: Number,
   
 }, {
   collection: "deals"              // Explicitly set the collection name

@@ -237,7 +237,8 @@ curl -X PUT http://127.0.0.1:9195/api/settings/69b0be36c48a03f03728c785 \
   -H "Content-Type: application/json" \
   -d '{
     "userRoles": [
-      { "role": "admin", "description": "Full system access, can manage users and all settings" },
+      { "role": "root", "description": "Full system access, can manage users and all settings" },
+      { "role": "admin", "description": "Full access for a given office, can manage users and all settings" },
       { "role": "manager", "description": "Can view and edit corporations, deals, and brokers" },
       { "role": "user", "description": "Read-only access to corporations and deals" }
     ]
@@ -310,3 +311,36 @@ curl -X PUT http://127.0.0.1:9195/api/useraccount/<ID> \
 # Delete a user account (replace <ID>)
 curl -X DELETE http://127.0.0.1:9195/api/useraccount/<ID> \
   -H "Authorization: Bearer <TOKEN>"
+
+
+================================================================================
+OFFICE RECORDS (admin only)
+================================================================================
+
+# Get all offices
+curl -X GET http://localhost:PORT/api/office \
+  -H "Authorization: Bearer TOKEN"
+
+# Get office acronyms list
+curl -X GET http://localhost:PORT/api/office/acronyms \
+  -H "Authorization: Bearer TOKEN"
+
+# Get office by ID
+curl -X GET http://localhost:PORT/api/office/ID \
+  -H "Authorization: Bearer TOKEN"
+
+# Add an office
+curl -X POST http://localhost:PORT/api/office \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"officeName":"Regional Office East","officeAcronym":"ROE","address":"123 Main St, Norfolk, VA","email":"roe@vetborrower.com","phone":"757-555-0100","officeTimezone":"America/New_York"}'
+
+# Update an office
+curl -X PUT http://localhost:PORT/api/office/ID \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"phone":"757-555-0199"}'
+
+# Delete an office
+curl -X DELETE http://localhost:PORT/api/office/ID \
+  -H "Authorization: Bearer TOKEN"

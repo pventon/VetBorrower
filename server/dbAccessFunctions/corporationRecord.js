@@ -15,8 +15,8 @@
  */
 import CorporationsModel from '../dbModel/corporationRecordModel.js';
 
-export async function GetAllCorporations() {
-  return await CorporationsModel.find({});
+export async function GetAllCorporations(filter = {}) {
+  return await CorporationsModel.find(filter);
 }
 
 export async function GetCorporationById(id) {
@@ -34,4 +34,12 @@ export async function UpdateCorporation(id, data) {
 
 export async function DeleteCorporation(id) {
   return await CorporationsModel.findByIdAndDelete(id);
+}
+
+export async function AddDealToCorporation(corpId, dealId) {
+  return await CorporationsModel.findByIdAndUpdate(corpId, { $push: { deals: dealId } });
+}
+
+export async function RemoveDealFromCorporation(corpId, dealId) {
+  return await CorporationsModel.findByIdAndUpdate(corpId, { $pull: { deals: dealId } });
 }

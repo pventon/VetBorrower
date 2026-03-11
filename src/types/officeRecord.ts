@@ -14,15 +14,14 @@
  * agreement or proposed agreement with Ventec SW LLC.
  */
 
-export interface BrokerRecord {
+export interface OfficeRecord {
   _id: string;
-  brokerName: string;
+  officeName: string;
   officeAcronym: string;
-  numberOfSubmissions: number;
-  numberOfDeclines: number;
-  numberOfApprovals: number;
-  numberOfFundedDeals: number;
-  totalDollarAmountFunded: number;
-  totalDollarAmountOfDefaults: number;
-  totalCommissionAmount: number;
+  address: string;
+  email: string;
+  phone: string;
+  officeTimezone: string;
+  dateCreated: string;
+  lastUpdated: string;
 }

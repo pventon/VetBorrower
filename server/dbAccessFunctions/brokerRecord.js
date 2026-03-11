@@ -15,8 +15,8 @@
  */
 import BrokersModel from '../dbModel/brokerRecordModel.js';
 
-export async function GetAllBrokers() {
-  return await BrokersModel.find({});
+export async function GetAllBrokers(officeAcronym) {
+  return await BrokersModel.find({ officeAcronym });
 }
 
 export async function GetBrokerById(id) {

@@ -20,6 +20,7 @@ export interface UserAccountRecord {
   firstName: string;
   lastName: string;
   role: string;
+  officeAcronym: string;
   isActive: boolean;
   lastLogin: string;
   dateRecordCreated: string;

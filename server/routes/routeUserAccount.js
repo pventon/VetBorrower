@@ -26,18 +26,21 @@ import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.
 
 const router = express.Router();
 
-// Get all user accounts (admin only)
-router.get('/api/useraccount', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+// Get all user accounts (root or admin; non-root callers never see root accounts)
+router.get('/api/useraccount', authenticateToken, authorizeRoles('root', 'admin'), async (req, res) => {
   try {
     const records = await GetAllUserAccounts();
-    res.json(records);
+    const visible = req.user.role === 'root'
+      ? records
+      : records.filter(r => r.role !== 'root');
+    res.json(visible);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // Get user account by ID (admin only)
-router.get('/api/useraccount/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+router.get('/api/useraccount/:id', authenticateToken, authorizeRoles('root', 'admin'), async (req, res) => {
   try {
     const record = await GetUserAccountById(req.params.id);
     if (!record) return res.status(404).json({ error: 'User account not found' });
@@ -47,9 +50,12 @@ router.get('/api/useraccount/:id', authenticateToken, authorizeRoles('admin'), a
   }
 });
 
-// Add a user account (admin only)
-router.post('/api/useraccount', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+// Add a user account (root or admin)
+router.post('/api/useraccount', authenticateToken, authorizeRoles('root', 'admin'), async (req, res) => {
   try {
+    if (req.body.role === 'root' && req.user.role !== 'root') {
+      return res.status(403).json({ error: 'Only root may assign the root role.' });
+    }
     const record = await AddUserAccount(req.body);
     res.status(201).json(record);
   } catch (error) {
@@ -60,9 +66,12 @@ router.post('/api/useraccount', authenticateToken, authorizeRoles('admin'), asyn
   }
 });
 
-// Update a user account (admin only)
-router.put('/api/useraccount/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+// Update a user account (root or admin)
+router.put('/api/useraccount/:id', authenticateToken, authorizeRoles('root', 'admin'), async (req, res) => {
   try {
+    if (req.body.role === 'root' && req.user.role !== 'root') {
+      return res.status(403).json({ error: 'Only root may assign the root role.' });
+    }
     // If password is being updated, hash it
     if (req.body.password) {
       req.body.password = await bcrypt.hash(req.body.password, 12);
@@ -76,7 +85,7 @@ router.put('/api/useraccount/:id', authenticateToken, authorizeRoles('admin'), a
 });
 
 // Delete a user account (admin only)
-router.delete('/api/useraccount/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+router.delete('/api/useraccount/:id', authenticateToken, authorizeRoles('root', 'admin'), async (req, res) => {
   try {
     const record = await DeleteUserAccount(req.params.id);
     if (!record) return res.status(404).json({ error: 'User account not found' });

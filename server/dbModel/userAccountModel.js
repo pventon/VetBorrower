@@ -23,6 +23,7 @@ const userAccountSchema = new mongoose.Schema({
   firstName: { type: String, required: true, trim: true },
   lastName: { type: String, required: true, trim: true },
   role: { type: String, required: true, default: 'user' },
+  officeAcronym: { type: String, default: '' },
   isActive: { type: Boolean, default: true },
   lastLogin: Date,
   dateRecordCreated: Date,

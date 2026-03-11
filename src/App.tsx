@@ -21,11 +21,19 @@ import Login from "./components/Login";
 import MenuBar from "./components/MenuBar";
 import UserAccountsDialog from "./components/UserAccountsDialog";
 import SystemSettingsDialog from "./components/SystemSettingsDialog";
+import OfficeDlg from "./components/OfficeDlg";
+import CorporationsDlg from "./components/CorporationsDlg";
+import BrokersDlg from "./components/BrokersDlg";
+import DealsDlg from "./components/DealsDlg";
 
 function App() {
     const { isAuthenticated, isLoading, user, logout } = useAuth();
     const [showUserAccounts, setShowUserAccounts] = useState(false);
     const [showSystemSettings, setShowSystemSettings] = useState(false);
+    const [showOffices, setShowOffices] = useState(false);
+    const [showCorporations, setShowCorporations] = useState(false);
+    const [showBrokers, setShowBrokers] = useState(false);
+    const [showDeals, setShowDeals] = useState(false);
 
     if (isLoading) {
         return <div className="loading">Loading...</div>;
@@ -38,7 +46,10 @@ function App() {
     return (
         <div className="app-container">
             <header className="app-header">
-                <h1>VetBorrower</h1>
+                <div className="app-title">
+                    <img src="/dollar-icon.png" alt="Logo" className="app-title-logo" />
+                    <h1>Vet Borrower</h1>
+                </div>
                 <div className="user-info">
                     <span>{user?.firstName} {user?.lastName} ({user?.role})</span>
                     <button onClick={logout}>Sign Out</button>
@@ -47,6 +58,10 @@ function App() {
             <MenuBar
                 onUserAccounts={() => setShowUserAccounts(true)}
                 onSystemSettings={() => setShowSystemSettings(true)}
+                onOffices={() => setShowOffices(true)}
+                onCorporations={() => setShowCorporations(true)}
+                onBrokers={() => setShowBrokers(true)}
+                onDeals={() => setShowDeals(true)}
             />
             <main>
                 <p>Welcome to VetBorrower - Under Construction</p>
@@ -57,6 +72,18 @@ function App() {
             )}
             {showSystemSettings && (
                 <SystemSettingsDialog onClose={() => setShowSystemSettings(false)} />
+            )}
+            {showOffices && (
+                <OfficeDlg onClose={() => setShowOffices(false)} />
+            )}
+            {showCorporations && (
+                <CorporationsDlg onClose={() => setShowCorporations(false)} />
+            )}
+            {showBrokers && (
+                <BrokersDlg onClose={() => setShowBrokers(false)} />
+            )}
+            {showDeals && (
+                <DealsDlg onClose={() => setShowDeals(false)} />
             )}
         </div>
     );

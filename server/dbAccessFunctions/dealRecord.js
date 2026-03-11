@@ -14,9 +14,16 @@
  * agreement or proposed agreement with Ventec SW LLC.
  */
 import DealsModel from '../dbModel/dealRecordModel.js';
+import CorporationsModel from '../dbModel/corporationRecordModel.js';
 
 export async function GetAllDeals() {
   return await DealsModel.find({});
+}
+
+export async function GetDealsByCorporation(corpId) {
+  const corp = await CorporationsModel.findById(corpId).select('deals');
+  if (!corp) return [];
+  return await DealsModel.find({ _id: { $in: corp.deals } }).populate('broker', 'brokerName');
 }
 
 export async function GetDealById(id) {

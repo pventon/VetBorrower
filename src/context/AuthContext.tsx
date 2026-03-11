@@ -27,7 +27,7 @@ interface AuthContextType {
     token: string | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-    login: (email: string, password: string) => Promise<string | null>;
+    login: (email: string, password: string, rememberMe?: boolean) => Promise<string | null>;
     logout: () => void;
     hasRole: (...roles: string[]) => boolean;
 }
@@ -59,16 +59,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const userData = await response.json();
                 setUser(userData);
                 setToken(existingToken);
-            } else {
-                // Token is invalid or expired
+            } else if (response.status === 401 || response.status === 403) {
+                // Token is genuinely invalid or expired — clear it
                 localStorage.removeItem("vb_token");
                 setToken(null);
                 setUser(null);
             }
+            // Any other error (500, network hiccup) — keep the token, try again next load
         } catch {
-            localStorage.removeItem("vb_token");
-            setToken(null);
-            setUser(null);
+            // Network error / server unreachable — keep token, don't wipe it
         } finally {
             setIsLoading(false);
         }
@@ -76,13 +75,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = async (
         email: string,
-        password: string
+        password: string,
+        rememberMe = false
     ): Promise<string | null> => {
         try {
             const response = await fetch(`${API_BASE}/api/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email, password, rememberMe }),
             });
 
             const data = await response.json();
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             value={{
                 user,
                 token,
-                isAuthenticated: user !== null,
+                isAuthenticated: token !== null,
                 isLoading,
                 login,
                 logout,

@@ -21,13 +21,15 @@ import {
   UpdateCorporation,
   DeleteCorporation
 } from '../dbAccessFunctions/corporationRecord.js';
+import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Get all corporations
-router.get('/api/corporation', async (req, res) => {
+// Get all corporations (root sees all; others see only their office)
+router.get('/api/corporation', authenticateToken, authorizeRoles('root', 'admin', 'manager', 'user'), async (req, res) => {
   try {
-    const records = await GetAllCorporations();
+    const filter = req.user.role === 'root' ? {} : { officeAcronym: req.user.officeAcronym };
+    const records = await GetAllCorporations(filter);
     res.json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -35,7 +37,7 @@ router.get('/api/corporation', async (req, res) => {
 });
 
 // Get corporation by ID
-router.get('/api/corporation/:id', async (req, res) => {
+router.get('/api/corporation/:id', authenticateToken, authorizeRoles('root', 'admin', 'manager', 'user'), async (req, res) => {
   try {
     const record = await GetCorporationById(req.params.id);
     if (!record) return res.status(404).json({ error: 'Corporation not found' });
@@ -45,9 +47,10 @@ router.get('/api/corporation/:id', async (req, res) => {
   }
 });
 
-// Add a corporation
-router.post('/api/corporation', async (req, res) => {
+// Add a corporation (officeAcronym is stamped from the authenticated user)
+router.post('/api/corporation', authenticateToken, authorizeRoles('root', 'admin', 'manager', 'user'), async (req, res) => {
   try {
+    req.body.officeAcronym = req.user.officeAcronym;
     const record = await AddCorporation(req.body);
     res.status(201).json(record);
   } catch (error) {
@@ -56,7 +59,7 @@ router.post('/api/corporation', async (req, res) => {
 });
 
 // Update a corporation
-router.put('/api/corporation/:id', async (req, res) => {
+router.put('/api/corporation/:id', authenticateToken, authorizeRoles('root', 'admin', 'manager', 'user'), async (req, res) => {
   try {
     const record = await UpdateCorporation(req.params.id, req.body);
     if (!record) return res.status(404).json({ error: 'Corporation not found' });
@@ -67,7 +70,7 @@ router.put('/api/corporation/:id', async (req, res) => {
 });
 
 // Delete a corporation
-router.delete('/api/corporation/:id', async (req, res) => {
+router.delete('/api/corporation/:id', authenticateToken, authorizeRoles('root', 'admin', 'manager', 'user'), async (req, res) => {
   try {
     const record = await DeleteCorporation(req.params.id);
     if (!record) return res.status(404).json({ error: 'Corporation not found' });

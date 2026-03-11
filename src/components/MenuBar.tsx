@@ -19,9 +19,13 @@ import { useAuth } from "../context/AuthContext";
 interface MenuBarProps {
     onUserAccounts: () => void;
     onSystemSettings: () => void;
+    onOffices: () => void;
+    onCorporations: () => void;
+    onBrokers: () => void;
+    onDeals: () => void;
 }
 
-export default function MenuBar({ onUserAccounts, onSystemSettings }: MenuBarProps) {
+export default function MenuBar({ onUserAccounts, onSystemSettings, onOffices, onCorporations, onBrokers, onDeals }: MenuBarProps) {
     const { hasRole } = useAuth();
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -36,34 +40,76 @@ export default function MenuBar({ onUserAccounts, onSystemSettings }: MenuBarPro
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    if (!hasRole("admin")) return null;
+    if (!hasRole("root", "admin", "manager", "user")) return null;
 
     return (
         <nav className="menu-bar" ref={menuRef}>
-            <div className="menu-item">
-                <button
-                    className={`menu-button ${openMenu === "settings" ? "active" : ""}`}
-                    onClick={() => setOpenMenu(openMenu === "settings" ? null : "settings")}
-                >
-                    Settings
-                </button>
-                {openMenu === "settings" && (
-                    <div className="menu-dropdown">
-                        <button
-                            className="menu-dropdown-item"
-                            onClick={() => { onUserAccounts(); setOpenMenu(null); }}
-                        >
-                            User Accounts...
-                        </button>
-                        <button
-                            className="menu-dropdown-item"
-                            onClick={() => { onSystemSettings(); setOpenMenu(null); }}
-                        >
-                            System Settings...
-                        </button>
-                    </div>
-                )}
-            </div>
+            {hasRole("root", "admin") && (
+                <div className="menu-item">
+                    <button
+                        className={`menu-button ${openMenu === "settings" ? "active" : ""}`}
+                        onClick={() => setOpenMenu(openMenu === "settings" ? null : "settings")}
+                    >
+                        Settings
+                    </button>
+                    {openMenu === "settings" && (
+                        <div className="menu-dropdown">
+                            <button
+                                className="menu-dropdown-item"
+                                onClick={() => { onUserAccounts(); setOpenMenu(null); }}
+                            >
+                                User Accounts...
+                            </button>
+                            <button
+                                className="menu-dropdown-item"
+                                onClick={() => { onSystemSettings(); setOpenMenu(null); }}
+                            >
+                                System Settings...
+                            </button>
+                            {hasRole("root") && (
+                                <button
+                                    className="menu-dropdown-item"
+                                    onClick={() => { onOffices(); setOpenMenu(null); }}
+                                >
+                                    Offices...
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+            {hasRole("admin", "manager", "user") && (
+                <div className="menu-item">
+                    <button
+                        className={`menu-button ${openMenu === "business" ? "active" : ""}`}
+                        onClick={() => setOpenMenu(openMenu === "business" ? null : "business")}
+                    >
+                        Business
+                    </button>
+                    {openMenu === "business" && (
+                        <div className="menu-dropdown">
+                            <button
+                                className="menu-dropdown-item"
+                                onClick={() => { onCorporations(); setOpenMenu(null); }}
+                            >
+                                Corporations...
+                            </button>
+                            <button
+                                className="menu-dropdown-item"
+                                onClick={() => { onBrokers(); setOpenMenu(null); }}
+                            >
+                                Brokers...
+                            </button>
+                            <button
+                                className="menu-dropdown-item"
+                                onClick={() => { onDeals(); setOpenMenu(null); }}
+                            >
+                                Deals...
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
         </nav>
     );
 }
