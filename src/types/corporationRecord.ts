@@ -19,6 +19,8 @@ export interface Owner {
   ownerPhone: string[];
   ownerEmail: string[];
   ethnicity: string;
+  dob: string;
+  age: number;
 }
 
 export interface Address {
@@ -37,8 +39,8 @@ export interface CorporationRecord {
   businessAddress: Address;
   homeAddress: Address;
   timeInBusiness: number;
+  businessStartDate: string;
   lengthOfOwnership: number;
-  dob: string;
   ficoScore: number;
   stateOfTheBusiness: string;
   industryType: string;

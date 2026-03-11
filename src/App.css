@@ -154,25 +154,21 @@ main {
   background-color: #6b7280;
   color: white;
   cursor: pointer;
-  transition: background-color 0.1s, transform 0.07s, box-shadow 0.07s;
-  box-shadow: 0 2px 0 #4b5563;
+  transition: background-color 0.12s;
   user-select: none;
 }
 
 .btn:hover {
-  background-color: #7c8594;
+  background-color: #9ca3af;
 }
 
 .btn:active {
-  transform: translateY(2px);
-  box-shadow: none;
+  background-color: #4b5563;
 }
 
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: 0 2px 0 #4b5563;
 }
 
 /* Small variant */
@@ -184,62 +180,53 @@ main {
 /* Primary (blue) — Save, confirm */
 .btn-primary {
   background-color: #2563eb;
-  box-shadow: 0 2px 0 #1d4ed8;
 }
 
 .btn-primary:hover {
-  background-color: #3b82f6;
+  background-color: #60a5fa;
 }
 
 .btn-primary:active {
-  transform: translateY(2px);
-  box-shadow: none;
+  background-color: #1d4ed8;
 }
 
 .btn-primary:disabled {
   background-color: #93c5fd;
-  box-shadow: 0 2px 0 #60a5fa;
 }
 
 /* Success (green) — Edit */
 .btn-success {
   background-color: #16a34a;
-  box-shadow: 0 2px 0 #15803d;
 }
 
 .btn-success:hover {
-  background-color: #22c55e;
+  background-color: #4ade80;
 }
 
 .btn-success:active {
-  transform: translateY(2px);
-  box-shadow: none;
+  background-color: #15803d;
 }
 
 .btn-success:disabled {
   background-color: #86efac;
-  box-shadow: 0 2px 0 #4ade80;
 }
 
 /* Danger (red) — Delete */
 .btn-danger {
   background-color: #dc2626;
   color: white;
-  box-shadow: 0 2px 0 #b91c1c;
 }
 
 .btn-danger:hover {
-  background-color: #ef4444;
+  background-color: #f87171;
 }
 
 .btn-danger:active {
-  transform: translateY(2px);
-  box-shadow: none;
+  background-color: #b91c1c;
 }
 
 .btn-danger:disabled {
   background-color: #fca5a5;
-  box-shadow: 0 2px 0 #f87171;
 }
 
 /* Menu Bar */
@@ -325,7 +312,7 @@ main {
 }
 
 .dialog-extra-wide {
-  max-width: 1100px;
+  max-width: 1210px;
 }
 
 .dialog-header {
@@ -497,6 +484,31 @@ main {
   outline: none;
   border-color: #4a90d9;
   box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+}
+
+.input-prefixed {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.input-prefixed .input-prefix-symbol {
+  display: flex;
+  align-items: center;
+  padding: 0 0.4rem;
+  background: #e9ecef;
+  border: 1px solid #ccc;
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+  font-size: 0.875rem;
+  color: #555;
+  white-space: nowrap;
+}
+
+.input-prefixed input {
+  flex: 1;
+  border-radius: 0 4px 4px 0 !important;
+  min-width: 0;
 }
 
 .checkbox-label {

@@ -21,6 +21,8 @@ const Owner = new mongoose.Schema({
   ownerPhone: [String],
   ownerEmail: [String],
   ethnicity: String,
+  dob: Date,
+  age: Number,
 
 }, { _id: false });
 
@@ -41,9 +43,9 @@ const corporationSchema = new mongoose.Schema({
   percentOfOwnership: Number,
   businessAddress: Address,
   homeAddress: Address,
-  timeInBusiness: Number,         // In years
+  timeInBusiness: Number,         // In days
+  businessStartDate: Date,
   lengthOfOwnership: Number,
-  dob: Date,
   ficoScore: Number,
   stateOfTheBusiness: String,     // US state the business operates in
   industryType: String,

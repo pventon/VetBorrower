@@ -32,7 +32,7 @@ type TabName = "general" | "industryTypes" | "usStates" | "userRoles";
 export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogProps) {
     const { token, hasRole } = useAuth();
     const { settings, refreshSettings } = useSettings();
-    const [activeTab, setActiveTab] = useState<TabName>("general");
+    const [activeTab, setActiveTab] = useState<TabName>(hasRole("root") ? "general" : "industryTypes");
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
@@ -126,7 +126,7 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
     };
 
     const tabs: { key: TabName; label: string }[] = [
-        { key: "general", label: "General" },
+        ...(hasRole("root") ? [{ key: "general" as TabName, label: "General" }] : []),
         { key: "industryTypes", label: "Industry Types" },
         { key: "usStates", label: "US States" },
         ...(hasRole("root") ? [{ key: "userRoles" as TabName, label: "User Roles" }] : []),

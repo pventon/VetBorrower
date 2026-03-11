@@ -18,15 +18,16 @@ export interface DealRecord {
   _id: string;
   officeAcronym: string;
   broker: { _id: string; brokerName: string } | null;  // populated from Brokers collection
-  referringIso: string;
   typeOfDeal: string;         // "new" | "renewal"
   position: string;
   fundedDate: string;
   defaultDate: string;
+  defaultDays: number;
   renewalDate: string;
   fundedAmount: number;
   netFundedAmount: number;
   originationFee: number;
+  originationFeePercent: number;
   loanTerm: number;           // days
   weeklyOrDailyPayment: boolean;
   paymentAmount: number;

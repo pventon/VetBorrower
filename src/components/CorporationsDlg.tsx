@@ -136,6 +136,8 @@ interface OwnerFormData {
     ownerPhone: string;
     ownerEmail: string;
     ethnicity: string;
+    dob: string;
+    age: string;
 }
 
 interface AddressFormData {
@@ -150,8 +152,8 @@ interface CorpFormData {
     dbaName: string;
     percentOfOwnership: number;
     timeInBusiness: number;
+    businessStartDate: string;
     lengthOfOwnership: number;
-    dob: string;
     ficoScore: number;
     stateOfTheBusiness: string;
     industryType: string;
@@ -163,14 +165,21 @@ interface CorpFormData {
 type TabName = "general" | "owner" | "business-address" | "home-address";
 
 const emptyAddress: AddressFormData = { streetName: "", city: "", state: "", zip: "" };
-const emptyOwner: OwnerFormData = { ownerName: "", ownerPhone: "", ownerEmail: "", ethnicity: "" };
+const emptyOwner: OwnerFormData = { ownerName: "", ownerPhone: "", ownerEmail: "", ethnicity: "", dob: "", age: "" };
 const emptyForm: CorpFormData = {
     businessName: "", dbaName: "", percentOfOwnership: 0,
-    timeInBusiness: 0, lengthOfOwnership: 0, dob: "", ficoScore: 0,
+    timeInBusiness: 0, businessStartDate: "", lengthOfOwnership: 0, ficoScore: 0,
     stateOfTheBusiness: "", industryType: "",
     businessAddress: { ...emptyAddress }, homeAddress: { ...emptyAddress },
     owners: [{ ...emptyOwner }],
 };
+
+function toDateInput(value: string | undefined): string {
+    if (!value) return "";
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().split("T")[0];
+}
 
 function formatPhone(value: string): string {
     const digits = value.replace(/\D/g, "").slice(0, 10);
@@ -233,14 +242,16 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
             ownerPhone: o.ownerPhone?.[0] ?? "",
             ownerEmail: o.ownerEmail?.[0] ?? "",
             ethnicity: o.ethnicity ?? "",
+            dob: toDateInput(o.dob),
+            age: o.age ? String(o.age) : "",
         }));
         setFormData({
             businessName: corp.businessName ?? "",
             dbaName: corp.dbaName ?? "",
             percentOfOwnership: corp.percentOfOwnership ?? 0,
             timeInBusiness: corp.timeInBusiness ?? 0,
+            businessStartDate: toDateInput(corp.businessStartDate),
             lengthOfOwnership: corp.lengthOfOwnership ?? 0,
-            dob: corp.dob ?? "",
             ficoScore: corp.ficoScore ?? 0,
             stateOfTheBusiness: corp.stateOfTheBusiness ?? "",
             industryType: corp.industryType ?? "",
@@ -278,6 +289,8 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                 ownerPhone: o.ownerPhone ? [o.ownerPhone] : [],
                 ownerEmail: o.ownerEmail ? [o.ownerEmail] : [],
                 ethnicity: o.ethnicity,
+                dob: o.dob || null,
+                age: o.age ? parseInt(o.age) : null,
             })),
         };
         delete body.owners;
@@ -313,7 +326,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
     };
 
     const handleDelete = async (corp: CorporationRecord) => {
-        if (!confirm(`Delete corporation ${corp.businessName}?`)) return;
+        if (!confirm(`Delete client ${corp.businessName}?`)) return;
 
         try {
             const res = await fetch(`${API_BASE}/api/corporation/${corp._id}`, {
@@ -348,7 +361,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
         <div className="dialog-overlay">
             <div className="dialog dialog-extra-wide">
                 <div className="dialog-header">
-                    <h2>Corporations</h2>
+                    <h2>Funded Clients</h2>
                     <button className="dialog-close" onClick={onClose}>&times;</button>
                 </div>
 
@@ -356,7 +369,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
 
                 <div className="dialog-body">
                     <div className="dialog-toolbar">
-                        <button className="btn" onClick={startAdd} disabled={showForm}>Add Corporation</button>
+                        <button className="btn" onClick={startAdd} disabled={showForm}>Add Client</button>
                     </div>
 
                     <table className="dialog-table">
@@ -392,7 +405,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
 
                     {showForm && (
                         <div className="dialog-form">
-                            <h3>{isAdding ? "Add Corporation" : "Edit Corporation"}</h3>
+                            <h3>{isAdding ? "Add Client" : "Edit Client"}</h3>
                             {formError && <div className="dialog-error">{formError}</div>}
 
                             <div className="settings-tabs">
@@ -452,13 +465,27 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                                 </select>
                                             </div>
                                             <div className="form-row" style={{ flex: 1 }}>
-                                                <label>Time in Business (yrs)</label>
+                                                <label>Business Start Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={formData.businessStartDate}
+                                                    onChange={(e) => {
+                                                        const dateStr = e.target.value;
+                                                        const days = dateStr ? Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000) : 0;
+                                                        setFormData({ ...formData, businessStartDate: dateStr, timeInBusiness: days > 0 ? days : 0 });
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="form-row" style={{ flex: 1 }}>
+                                                <label>Time in Business (days)</label>
                                                 <input
                                                     type="number"
-                                                    step="0.5"
-                                                    placeholder="e.g. 1.5"
                                                     value={formData.timeInBusiness || ""}
-                                                    onChange={(e) => setFormData({ ...formData, timeInBusiness: Number(e.target.value) })}
+                                                    onChange={(e) => {
+                                                        const days = parseInt(e.target.value) || 0;
+                                                        const dateStr = days > 0 ? new Date(Date.now() - days * 86400000).toISOString().split("T")[0] : "";
+                                                        setFormData({ ...formData, timeInBusiness: days, businessStartDate: dateStr });
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -474,6 +501,8 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                                     <th>Name</th>
                                                     <th>Phone</th>
                                                     <th>Email</th>
+                                                    <th>Date of Birth</th>
+                                                    <th>Age</th>
                                                     <th>Ethnicity</th>
                                                     <th>Actions</th>
                                                 </tr>
@@ -500,6 +529,32 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                                                 type="email"
                                                                 value={owner.ownerEmail}
                                                                 onChange={(e) => updateOwner(index, "ownerEmail", e.target.value)}
+                                                            />
+                                                        </td>
+                                                        <td>
+                                                            <input
+                                                                type="date"
+                                                                value={owner.dob}
+                                                                onChange={(e) => {
+                                                                    const dob = e.target.value;
+                                                                    const age = dob ? String(Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 86400000))) : "";
+                                                                    const updated = formData.owners.map((o, i) => i === index ? { ...o, dob, age } : o);
+                                                                    setFormData({ ...formData, owners: updated });
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td>
+                                                            <input
+                                                                type="number"
+                                                                value={owner.age}
+                                                                style={{ width: "4rem" }}
+                                                                onChange={(e) => {
+                                                                    const age = e.target.value;
+                                                                    const today = new Date();
+                                                                    const dob = age ? new Date(today.getFullYear() - parseInt(age), today.getMonth(), today.getDate()).toISOString().split("T")[0] : "";
+                                                                    const updated = formData.owners.map((o, i) => i === index ? { ...o, age, dob } : o);
+                                                                    setFormData({ ...formData, owners: updated });
+                                                                }}
                                                             />
                                                         </td>
                                                         <td>

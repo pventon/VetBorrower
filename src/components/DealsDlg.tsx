@@ -30,15 +30,16 @@ interface DealsDlgProps {
 
 interface DealFormData {
     broker: string;
-    referringIso: string;
     typeOfDeal: string;
     position: string;
     fundedDate: string;
     defaultDate: string;
+    defaultDays: string;
     renewalDate: string;
     fundedAmount: string;
     netFundedAmount: string;
     originationFee: string;
+    originationFeePercent: string;
     loanTerm: string;
     weeklyOrDailyPayment: string;   // "true" = weekly, "false" = daily
     paymentAmount: string;
@@ -50,15 +51,16 @@ interface DealFormData {
 
 const emptyForm: DealFormData = {
     broker: "",
-    referringIso: "",
     typeOfDeal: "new",
     position: "",
     fundedDate: "",
     defaultDate: "",
+    defaultDays: "",
     renewalDate: "",
     fundedAmount: "",
     netFundedAmount: "",
     originationFee: "",
+    originationFeePercent: "",
     loanTerm: "",
     weeklyOrDailyPayment: "false",
     paymentAmount: "",
@@ -150,22 +152,25 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         setEditingDeal(deal);
         setFormData({
             broker: deal.broker?._id ?? "",
-            referringIso: deal.referringIso ?? "",
             typeOfDeal: deal.typeOfDeal ?? "new",
             position: deal.position ?? "",
             fundedDate: toDateInput(deal.fundedDate),
             defaultDate: toDateInput(deal.defaultDate),
+            defaultDays: deal.defaultDays?.toString() ?? "",
             renewalDate: toDateInput(deal.renewalDate),
-            fundedAmount: deal.fundedAmount?.toString() ?? "",
+            fundedAmount: deal.fundedAmount?.toFixed(2) ?? "",
             netFundedAmount: deal.netFundedAmount?.toString() ?? "",
-            originationFee: deal.originationFee?.toString() ?? "",
+            originationFee: deal.originationFee?.toFixed(2) ?? "",
+            originationFeePercent: deal.originationFeePercent?.toFixed(2) ?? "",
             loanTerm: deal.loanTerm?.toString() ?? "",
             weeklyOrDailyPayment: deal.weeklyOrDailyPayment ? "true" : "false",
             paymentAmount: deal.paymentAmount?.toString() ?? "",
             buyRate: deal.buyRate?.toString() ?? "",
-            factorRate: deal.factorRate?.toString() ?? "",
-            mcaHistory: deal.mcaHistory ?? "",
             brokerFee: deal.brokerFee?.toString() ?? "",
+            factorRate: deal.buyRate != null && deal.brokerFee != null
+                ? (deal.buyRate + deal.brokerFee / 100).toFixed(4)
+                : deal.factorRate?.toString() ?? "",
+            mcaHistory: deal.mcaHistory ?? "",
         });
         setFormError(null);
     };
@@ -183,15 +188,16 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         const payload = {
             corporationId: selectedCorpId,
             broker: formData.broker || null,
-            referringIso: formData.referringIso,
             typeOfDeal: formData.typeOfDeal,
             position: formData.position,
             fundedDate: formData.fundedDate || null,
             defaultDate: formData.defaultDate || null,
+            defaultDays: formData.defaultDays ? parseInt(formData.defaultDays) : null,
             renewalDate: formData.renewalDate || null,
             fundedAmount: formData.fundedAmount ? parseFloat(formData.fundedAmount) : null,
             netFundedAmount: formData.netFundedAmount ? parseFloat(formData.netFundedAmount) : null,
             originationFee: formData.originationFee ? parseFloat(formData.originationFee) : null,
+            originationFeePercent: formData.originationFeePercent ? parseFloat(formData.originationFeePercent) : null,
             loanTerm: formData.loanTerm ? parseInt(formData.loanTerm) : null,
             weeklyOrDailyPayment: formData.weeklyOrDailyPayment === "true",
             paymentAmount: formData.paymentAmount ? parseFloat(formData.paymentAmount) : null,
@@ -241,14 +247,29 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
     const showForm = isAdding || editingDeal !== null;
 
-    const field = (label: string, key: keyof DealFormData, type = "text") => (
+    const field = (label: string, key: keyof DealFormData, type = "text", prefix?: string) => (
         <div className="form-row">
             <label>{label}</label>
-            <input
-                type={type}
-                value={formData[key]}
-                onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
-            />
+            {prefix ? (
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">{prefix}</span>
+                    <input
+                        type={type}
+                        step={type === "number" ? "0.01" : undefined}
+                        placeholder={type === "number" ? "0.00" : undefined}
+                        value={formData[key]}
+                        onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
+                    />
+                </div>
+            ) : (
+                <input
+                    type={type}
+                    step={type === "number" ? "0.01" : undefined}
+                    placeholder={type === "number" ? "0.00" : undefined}
+                    value={formData[key]}
+                    onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
+                />
+            )}
         </div>
     );
 
@@ -325,60 +346,224 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             <h3>{isAdding ? "Add Deal" : "Edit Deal"}</h3>
                             {formError && <div className="dialog-error">{formError}</div>}
 
-                            <div style={{ display: "flex", gap: "1rem" }}>
-                                <div style={{ flex: 1 }}>
-                                    <div className="form-row">
-                                        <label>Broker</label>
-                                        <select
-                                            value={formData.broker}
-                                            onChange={(e) => setFormData({ ...formData, broker: e.target.value })}
-                                        >
-                                            <option value="">-- None --</option>
-                                            {brokers.map((b) => (
-                                                <option key={b._id} value={b._id}>{b.brokerName}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    {field("Referring ISO", "referringIso")}
-                                    <div className="form-row">
-                                        <label>Type of Deal</label>
-                                        <select
-                                            value={formData.typeOfDeal}
-                                            onChange={(e) => setFormData({ ...formData, typeOfDeal: e.target.value })}
-                                        >
-                                            <option value="new">New</option>
-                                            <option value="renewal">Renewal</option>
-                                        </select>
-                                    </div>
-                                    {field("Position", "position")}
-                                    {field("MCA History", "mcaHistory")}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0 1rem" }}>
+                                {/* Row 1: Broker | Type of Deal | Position | MCA History */}
+                                <div className="form-row">
+                                    <label>Broker</label>
+                                    <select
+                                        value={formData.broker}
+                                        onChange={(e) => setFormData({ ...formData, broker: e.target.value })}
+                                    >
+                                        <option value="">-- None --</option>
+                                        {brokers.map((b) => (
+                                            <option key={b._id} value={b._id}>{b.brokerName}</option>
+                                        ))}
+                                    </select>
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                    {field("Funded Date", "fundedDate", "date")}
-                                    {field("Default Date", "defaultDate", "date")}
-                                    {field("Renewal Date", "renewalDate", "date")}
+                                <div className="form-row">
+                                    <label>Type of Deal</label>
+                                    <select
+                                        value={formData.typeOfDeal}
+                                        onChange={(e) => setFormData({ ...formData, typeOfDeal: e.target.value })}
+                                    >
+                                        <option value="new">New</option>
+                                        <option value="renewal">Renewal</option>
+                                    </select>
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                    {field("Funded Amount ($)", "fundedAmount", "number")}
-                                    {field("Net Funded Amount ($)", "netFundedAmount", "number")}
-                                    {field("Origination Fee ($)", "originationFee", "number")}
-                                    {field("Broker Fee ($)", "brokerFee", "number")}
+                                {field("Position", "position")}
+                                <div className="form-row">
+                                    <label>MCA History</label>
+                                    <select
+                                        value={formData.mcaHistory}
+                                        onChange={(e) => setFormData({ ...formData, mcaHistory: e.target.value })}
+                                    >
+                                        <option value="">-- Select --</option>
+                                        <option value="Yes">Yes</option>
+                                        <option value="No">No</option>
+                                    </select>
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                    {field("Loan Term (days)", "loanTerm", "number")}
-                                    {field("Payment Amount ($)", "paymentAmount", "number")}
-                                    {field("Buy Rate", "buyRate", "number")}
-                                    {field("Factor Rate", "factorRate", "number")}
-                                    <div className="form-row">
-                                        <label>Payment Frequency</label>
-                                        <select
-                                            value={formData.weeklyOrDailyPayment}
-                                            onChange={(e) => setFormData({ ...formData, weeklyOrDailyPayment: e.target.value })}
-                                        >
-                                            <option value="false">Daily</option>
-                                            <option value="true">Weekly</option>
-                                        </select>
+
+                                {/* Row 2: Funded Date | Funded Amount | Origination Fee | Net Funded Amount */}
+                                {field("Funded Date", "fundedDate", "date")}
+                                <div className="form-row">
+                                    <label>Funded Amount</label>
+                                    <div className="input-prefixed">
+                                        <span className="input-prefix-symbol">$</span>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.fundedAmount}
+                                            onChange={(e) => {
+                                                const funded = e.target.value;
+                                                const fundedNum = parseFloat(funded);
+                                                const feeNum = parseFloat(formData.originationFee);
+                                                const net = funded !== "" && formData.originationFee !== ""
+                                                    ? (fundedNum - feeNum).toFixed(2)
+                                                    : funded !== "" ? parseFloat(funded).toFixed(2) : "";
+                                                const pct = funded !== "" && formData.originationFee !== "" && fundedNum !== 0
+                                                    ? ((feeNum / fundedNum) * 100).toFixed(2)
+                                                    : formData.originationFeePercent;
+                                                setFormData({ ...formData, fundedAmount: funded, netFundedAmount: net, originationFeePercent: pct });
+                                            }}
+                                            onBlur={(e) => {
+                                                const v = parseFloat(e.target.value);
+                                                if (!isNaN(v)) setFormData((f) => ({ ...f, fundedAmount: v.toFixed(2) }));
+                                            }}
+                                        />
                                     </div>
+                                </div>
+                                <div className="form-row">
+                                    <label>Origination Fee</label>
+                                    <div style={{ display: "flex", gap: "0.4rem" }}>
+                                        <div className="input-prefixed" style={{ flex: 1 }}>
+                                            <span className="input-prefix-symbol">%</span>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="0.00"
+                                                value={formData.originationFeePercent}
+                                                onChange={(e) => {
+                                                    const pct = e.target.value;
+                                                    const pctNum = parseFloat(pct);
+                                                    const fundedNum = parseFloat(formData.fundedAmount);
+                                                    const fee = pct !== "" && formData.fundedAmount !== ""
+                                                        ? ((pctNum / 100) * fundedNum).toFixed(2)
+                                                        : formData.originationFee;
+                                                    const net = fee !== "" && formData.fundedAmount !== ""
+                                                        ? (fundedNum - parseFloat(fee)).toFixed(2)
+                                                        : formData.netFundedAmount;
+                                                    setFormData({ ...formData, originationFeePercent: pct, originationFee: fee, netFundedAmount: net });
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="input-prefixed" style={{ flex: 1 }}>
+                                            <span className="input-prefix-symbol">$</span>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="0.00"
+                                                value={formData.originationFee}
+                                                onChange={(e) => {
+                                                    const fee = e.target.value;
+                                                    const feeNum = parseFloat(fee);
+                                                    const fundedNum = parseFloat(formData.fundedAmount);
+                                                    const pct = fee !== "" && formData.fundedAmount !== "" && fundedNum !== 0
+                                                        ? ((feeNum / fundedNum) * 100).toFixed(2)
+                                                        : formData.originationFeePercent;
+                                                    const net = fee !== "" && formData.fundedAmount !== ""
+                                                        ? (fundedNum - feeNum).toFixed(2)
+                                                        : formData.fundedAmount !== "" ? parseFloat(formData.fundedAmount).toFixed(2) : "";
+                                                    setFormData({ ...formData, originationFee: fee, originationFeePercent: pct, netFundedAmount: net });
+                                                }}
+                                                onBlur={(e) => {
+                                                    const v = parseFloat(e.target.value);
+                                                    if (!isNaN(v)) setFormData((f) => ({ ...f, originationFee: v.toFixed(2) }));
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <label>Net Funded Amount</label>
+                                    <div className="input-prefixed">
+                                        <span className="input-prefix-symbol">$</span>
+                                        <input type="number" step="0.01" value={formData.netFundedAmount} disabled />
+                                    </div>
+                                </div>
+
+                                {/* Row 3: Default Date/Days | Buy Rate | Broker Fee | Factor Rate */}
+                                <div className="form-row">
+                                    <label>Default Date / Days</label>
+                                    <div style={{ display: "flex", gap: "0.4rem" }}>
+                                        <input
+                                            type="date"
+                                            style={{ flex: 2 }}
+                                            value={formData.defaultDate}
+                                            onChange={(e) => {
+                                                const dateVal = e.target.value;
+                                                let days = "";
+                                                if (dateVal) {
+                                                    const diff = Date.now() - new Date(dateVal).getTime();
+                                                    days = Math.floor(diff / 86400000).toString();
+                                                }
+                                                setFormData({ ...formData, defaultDate: dateVal, defaultDays: days });
+                                            }}
+                                        />
+                                        <input
+                                            type="number"
+                                            style={{ flex: 1, minWidth: 0 }}
+                                            placeholder="Days"
+                                            value={formData.defaultDays}
+                                            onChange={(e) => {
+                                                const daysVal = e.target.value;
+                                                let dateStr = "";
+                                                if (daysVal !== "") {
+                                                    const d = new Date(Date.now() - parseInt(daysVal) * 86400000);
+                                                    dateStr = d.toISOString().split("T")[0];
+                                                }
+                                                setFormData({ ...formData, defaultDays: daysVal, defaultDate: dateStr });
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <label>Buy Rate</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.buyRate}
+                                        onChange={(e) => {
+                                            const buy = e.target.value;
+                                            const buyNum = parseFloat(buy);
+                                            const feeNum = parseFloat(formData.brokerFee);
+                                            const factor = buy !== "" && formData.brokerFee !== ""
+                                                ? (buyNum + feeNum / 100).toFixed(4)
+                                                : buy !== "" ? buy : "";
+                                            setFormData({ ...formData, buyRate: buy, factorRate: factor });
+                                        }}
+                                    />
+                                </div>
+                                <div className="form-row">
+                                    <label>Broker Fee</label>
+                                    <div className="input-prefixed">
+                                        <span className="input-prefix-symbol">%</span>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.brokerFee}
+                                            onChange={(e) => {
+                                                const fee = e.target.value;
+                                                const feeNum = parseFloat(fee);
+                                                const buyNum = parseFloat(formData.buyRate);
+                                                const factor = fee !== "" && formData.buyRate !== ""
+                                                    ? (buyNum + feeNum / 100).toFixed(4)
+                                                    : formData.buyRate !== "" ? formData.buyRate : "";
+                                                setFormData({ ...formData, brokerFee: fee, factorRate: factor });
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <label>Factor Rate</label>
+                                    <input type="number" step="0.0001" value={formData.factorRate} disabled />
+                                </div>
+
+                                {/* Row 4: Renewal Date | Loan Term | Payment Amount | Payment Frequency */}
+                                {field("Renewal Date", "renewalDate", "date")}
+                                {field("Loan Term (days)", "loanTerm", "number")}
+                                {field("Payment Amount", "paymentAmount", "number", "$")}
+                                <div className="form-row">
+                                    <label>Payment Frequency</label>
+                                    <select
+                                        value={formData.weeklyOrDailyPayment}
+                                        onChange={(e) => setFormData({ ...formData, weeklyOrDailyPayment: e.target.value })}
+                                    >
+                                        <option value="false">Daily</option>
+                                        <option value="true">Weekly</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>

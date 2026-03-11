@@ -19,15 +19,16 @@ const dealSchema = new mongoose.Schema({
     
   officeAcronym: String,
   broker: { type: mongoose.Schema.Types.ObjectId, ref: 'Brokers' },
-  referringIso: String,
   typeOfDeal: String,             // new/renewal
   position: String,               // Number of lenders assigned 
   fundedDate: Date,
   defaultDate: Date,
+  defaultDays: Number,
   renewalDate: Date,
   fundedAmount: Number,
   netFundedAmount: Number,
   originationFee: Number,
+  originationFeePercent: Number,
   loanTerm: Number,               // How many days
   weeklyOrDailyPayment: Boolean,  // True = weekly, fale = daily
   paymentAmount: Number,

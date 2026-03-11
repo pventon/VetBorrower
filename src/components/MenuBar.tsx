@@ -92,7 +92,7 @@ export default function MenuBar({ onUserAccounts, onSystemSettings, onOffices, o
                                 className="menu-dropdown-item"
                                 onClick={() => { onCorporations(); setOpenMenu(null); }}
                             >
-                                Corporations...
+                                Funded Clients...
                             </button>
                             <button
                                 className="menu-dropdown-item"
