@@ -503,11 +503,19 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                                             />
                                                         </td>
                                                         <td>
-                                                            <input
-                                                                type="text"
+                                                            <select
                                                                 value={owner.ethnicity}
                                                                 onChange={(e) => updateOwner(index, "ethnicity", e.target.value)}
-                                                            />
+                                                            >
+                                                                <option value="">-- Select --</option>
+                                                                <option value="Hispanic or Latino">Hispanic or Latino</option>
+                                                                <option value="American Indian or Alaska Native">American Indian or Alaska Native</option>
+                                                                <option value="Asian">Asian</option>
+                                                                <option value="Black or African American">Black or African American</option>
+                                                                <option value="Native Hawaiian or Other Pacific Islander">Native Hawaiian or Other Pacific Islander</option>
+                                                                <option value="White">White</option>
+                                                                <option value="Not Provided / Declined to State">Not Provided / Declined to State</option>
+                                                            </select>
                                                         </td>
                                                         <td className="action-cell">
                                                             <button
