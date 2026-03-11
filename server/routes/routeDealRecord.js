@@ -54,6 +54,7 @@ router.post('/api/deal', authenticateToken, async (req, res) => {
   try {
     const { corporationId, ...dealData } = req.body;
     if (!corporationId) return res.status(400).json({ error: 'corporationId is required' });
+    dealData.officeAcronym = req.user.officeAcronym;
     const record = await AddDeal(dealData);
     await AddDealToCorporation(corporationId, record._id);
     res.status(201).json(record);
@@ -65,7 +66,8 @@ router.post('/api/deal', authenticateToken, async (req, res) => {
 // Update a deal
 router.put('/api/deal/:id', authenticateToken, async (req, res) => {
   try {
-    const record = await UpdateDeal(req.params.id, req.body);
+    const dealData = { ...req.body, officeAcronym: req.user.officeAcronym };
+    const record = await UpdateDeal(req.params.id, dealData);
     if (!record) return res.status(404).json({ error: 'Deal not found' });
     res.json(record);
   } catch (error) {

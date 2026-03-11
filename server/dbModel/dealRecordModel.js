@@ -17,6 +17,7 @@ import mongoose from 'mongoose';
 
 const dealSchema = new mongoose.Schema({
     
+  officeAcronym: String,
   broker: { type: mongoose.Schema.Types.ObjectId, ref: 'Brokers' },
   referringIso: String,
   typeOfDeal: String,             // new/renewal

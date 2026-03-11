@@ -379,7 +379,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                     <td>{corp.industryType}</td>
                                     <td>{corp.stateOfTheBusiness}</td>
                                     <td className="action-cell">
-                                        <button className="btn btn-sm" onClick={() => startEdit(corp)} disabled={showForm}>Edit</button>
+                                        <button className="btn btn-sm btn-success" onClick={() => startEdit(corp)} disabled={showForm}>Edit</button>
                                         <button className="btn btn-sm btn-danger" onClick={() => handleDelete(corp)} disabled={showForm}>Delete</button>
                                     </td>
                                 </tr>

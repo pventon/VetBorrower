@@ -227,7 +227,7 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
                                     <td>{user.officeAcronym}</td>
                                     <td>{user.isActive ? "Yes" : "No"}</td>
                                     <td className="action-cell">
-                                        <button className="btn btn-sm" onClick={() => startEdit(user)} disabled={showForm}>Edit</button>
+                                        <button className="btn btn-sm btn-success" onClick={() => startEdit(user)} disabled={showForm}>Edit</button>
                                         <button className="btn btn-sm btn-danger" onClick={() => handleDelete(user)} disabled={showForm || user.email === DEFAULT_ADMIN_EMAIL}>Delete</button>
                                     </td>
                                 </tr>

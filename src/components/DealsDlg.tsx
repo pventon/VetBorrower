@@ -308,7 +308,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         <td>{deal.loanTerm ?? "-"}</td>
                                         <td>{deal.factorRate ?? "-"}</td>
                                         <td className="action-cell">
-                                            <button className="btn btn-sm" onClick={() => startEdit(deal)} disabled={showForm}>Edit</button>
+                                            <button className="btn btn-sm btn-success" onClick={() => startEdit(deal)} disabled={showForm}>Edit</button>
                                             <button className="btn btn-sm btn-danger" onClick={() => handleDelete(deal)} disabled={showForm}>Delete</button>
                                         </td>
                                     </tr>

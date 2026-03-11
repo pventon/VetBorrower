@@ -185,7 +185,7 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                                     <td>{formatCurrency(broker.totalDollarAmountOfDefaults ?? 0)}</td>
                                     <td>{formatCurrency(broker.totalCommissionAmount ?? 0)}</td>
                                     <td className="action-cell">
-                                        <button className="btn btn-sm" onClick={() => startEdit(broker)} disabled={showForm}>Edit</button>
+                                        <button className="btn btn-sm btn-success" onClick={() => startEdit(broker)} disabled={showForm}>Edit</button>
                                         <button className="btn btn-sm btn-danger" onClick={() => handleDelete(broker)} disabled={showForm}>Delete</button>
                                     </td>
                                 </tr>

@@ -16,6 +16,7 @@
 
 export interface DealRecord {
   _id: string;
+  officeAcronym: string;
   broker: { _id: string; brokerName: string } | null;  // populated from Brokers collection
   referringIso: string;
   typeOfDeal: string;         // "new" | "renewal"

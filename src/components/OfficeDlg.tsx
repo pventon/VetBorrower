@@ -313,7 +313,7 @@ export default function OfficeDlg({ onClose }: OfficeDlgProps) {
                                     <td>{office.phone}</td>
                                     <td>{office.officeTimezone}</td>
                                     <td className="action-cell">
-                                        <button className="btn btn-sm" onClick={() => startEdit(office)} disabled={showForm}>Edit</button>
+                                        <button className="btn btn-sm btn-success" onClick={() => startEdit(office)} disabled={showForm}>Edit</button>
                                         <button className="btn btn-sm btn-danger" onClick={() => handleDelete(office)} disabled={showForm}>Delete</button>
                                     </td>
                                 </tr>
