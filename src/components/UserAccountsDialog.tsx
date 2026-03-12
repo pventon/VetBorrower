@@ -50,7 +50,8 @@ const emptyForm: UserFormData = {
 };
 
 export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps) {
-    const { token, hasRole } = useAuth();
+    const { token, hasRole, user: currentUser } = useAuth();
+    const isRoot = hasRole("root");
     const { settings } = useSettings();
     const [users, setUsers] = useState<UserAccountRecord[]>([]);
     const [officeAcronyms, setOfficeAcronyms] = useState<string[]>([]);
@@ -92,8 +93,12 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
 
     // Roles available in the dropdown — non-root users cannot see or assign 'root'
     const availableRoles = settings?.userRoles?.filter(
-        (r) => hasRole("root") || r.role !== "root"
+        (r) => isRoot || r.role !== "root"
     ) ?? [];
+
+    const displayedUsers = isRoot
+        ? users
+        : users.filter((u) => u.officeAcronym === currentUser?.officeAcronym);
 
     const startAdd = () => {
         setEditingUser(null);
@@ -285,18 +290,18 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
                                     <th>Email</th>
                                     <th>Name</th>
                                     <th>Role</th>
-                                    <th>Office</th>
+                                    {isRoot && <th>Office</th>}
                                     <th>Active</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {users.map((user) => (
+                                {displayedUsers.map((user) => (
                                     <tr key={user._id} className={editingUser?._id === user._id ? "selected-row" : ""}>
                                         <td>{user.email}</td>
                                         <td>{user.firstName} {user.lastName}</td>
                                         <td>{user.role}</td>
-                                        <td>{user.officeAcronym}</td>
+                                        {isRoot && <td>{user.officeAcronym}</td>}
                                         <td>{user.isActive ? "Yes" : "No"}</td>
                                         <td className="action-cell">
                                             <button className="btn btn-sm btn-success" onClick={() => startEdit(user)} disabled={isAdding || showForm}>Edit</button>
@@ -304,8 +309,8 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
                                         </td>
                                     </tr>
                                 ))}
-                                {users.length === 0 && (
-                                    <tr><td colSpan={6} className="empty-row">No user accounts found</td></tr>
+                                {displayedUsers.length === 0 && (
+                                    <tr><td colSpan={isRoot ? 6 : 5} className="empty-row">No user accounts found</td></tr>
                                 )}
                             </tbody>
                         </table>

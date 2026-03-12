@@ -679,7 +679,6 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                 <tr>
                                     <th>Business Name</th>
                                     <th>DBA</th>
-                                    <th>Office</th>
                                     <th>Industry</th>
                                     <th>State</th>
                                     <th>Actions</th>
@@ -690,7 +689,6 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                     <tr key={corp._id} className={editingCorp?._id === corp._id ? "selected-row" : ""}>
                                         <td>{corp.businessName}</td>
                                         <td>{corp.dbaName}</td>
-                                        <td>{corp.officeAcronym}</td>
                                         <td>{corp.industryType}</td>
                                         <td>{corp.stateOfTheBusiness}</td>
                                         <td className="action-cell">
@@ -700,7 +698,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                     </tr>
                                 ))}
                                 {corporations.length === 0 && (
-                                    <tr><td colSpan={6} className="empty-row">No corporations found</td></tr>
+                                    <tr><td colSpan={5} className="empty-row">No corporations found</td></tr>
                                 )}
                             </tbody>
                         </table>
