@@ -292,12 +292,12 @@ main {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 5vh;
+  padding-top: calc(5vh + 100px);
   z-index: 2000;
 }
 
 .dialog {
-  background: linear-gradient(135deg, #c9d9ee 0%, #e8eef5 40%, #f5f7fa 70%, #ffffff 100%);
+  background: linear-gradient(135deg, #b8ccdf 0%, #d8e3ed 40%, #e4eaf2 70%, #eceff5 100%);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   width: 90%;
@@ -320,15 +320,15 @@ main {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #d0d9e4;
-  background: linear-gradient(90deg, #dde6f0 0%, #eef2f7 100%);
+  border-bottom: 1px solid #1e2f3f;
+  background: linear-gradient(90deg, #2c3e50 0%, #3d5470 100%);
   border-radius: 8px 8px 0 0;
 }
 
 .dialog-header h2 {
   margin: 0;
   font-size: 1.1rem;
-  color: #333;
+  color: #ffffff;
 }
 
 .dialog-close {
@@ -336,12 +336,12 @@ main {
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #999;
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1;
 }
 
 .dialog-close:hover {
-  color: #333;
+  color: #ffffff;
 }
 
 .dialog-body {
@@ -390,6 +390,12 @@ main {
   font-size: 0.875rem;
   box-sizing: border-box;
   height: calc(0.875rem + 0.8rem + 2px);
+}
+
+.dialog-toolbar select:not(:disabled):hover,
+.dialog-toolbar input:not(:disabled):hover {
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 1px #4a90d9;
 }
 
 /* Dialog Table */
@@ -477,6 +483,12 @@ main {
 .form-row input[type="date"] {
   line-height: normal;
   height: calc(0.875rem + 0.9rem + 2px); /* matches font-size + vertical padding + border */
+}
+
+.form-row input:not(:disabled):hover,
+.form-row select:not(:disabled):hover {
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 1px #4a90d9;
 }
 
 .form-row input:focus,
