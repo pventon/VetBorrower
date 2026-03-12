@@ -142,67 +142,76 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
         }
     };
 
-    const showForm = isAdding || editingBroker !== null;
+    const showForm = editingBroker !== null;
 
     return (
-        <div className="dialog-overlay">
-            <div className="dialog dialog-extra-wide">
-                <div className="dialog-header">
-                    <h2>Brokers</h2>
-                    <button className="dialog-close" onClick={onClose}>&times;</button>
-                </div>
-
-                {error && <div className="dialog-error">{error}</div>}
-
-                <div className="dialog-body">
-                    <div className="dialog-toolbar">
-                        <button className="btn" onClick={startAdd} disabled={showForm}>Add Broker</button>
+        <>
+            <div className="dialog-overlay">
+                <div className="dialog dialog-extra-wide">
+                    <div className="dialog-header">
+                        <h2>Brokers</h2>
+                        <button className="dialog-close" onClick={onClose}>&times;</button>
                     </div>
 
-                    <table className="dialog-table">
-                        <thead>
-                            <tr>
-                                <th>Broker Name</th>
-                                <th style={{ textAlign: "center" }}>Submissions</th>
-                                <th style={{ textAlign: "center" }}>Approvals</th>
-                                <th style={{ textAlign: "center" }}>Declines</th>
-                                <th style={{ textAlign: "center" }}>Funded Deals</th>
-                                <th style={{ textAlign: "right" }}>Total Funded</th>
-                                <th style={{ textAlign: "right" }}>Defaults</th>
-                                <th style={{ textAlign: "center" }}>Num. Defaults</th>
-                                <th style={{ textAlign: "right" }}>Commission</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {brokers.map((broker) => (
-                                <tr key={broker._id} className={editingBroker?._id === broker._id ? "selected-row" : ""}>
-                                    <td>{broker.brokerName}</td>
-                                    <td style={{ textAlign: "center" }}>{broker.numberOfSubmissions ?? 0}</td>
-                                    <td style={{ textAlign: "center" }}>{broker.numberOfApprovals ?? 0}</td>
-                                    <td style={{ textAlign: "center" }}>{broker.numberOfDeclines ?? 0}</td>
-                                    <td style={{ textAlign: "center" }}>{broker.numberOfFundedDeals ?? 0}</td>
-                                    <td style={{ textAlign: "right" }}>{formatCurrency(broker.totalDollarAmountFunded ?? 0)}</td>
-                                    <td style={{ textAlign: "right" }}>{formatCurrency(broker.totalDollarAmountOfDefaults ?? 0)}</td>
-                                    <td style={{ textAlign: "center" }}>{broker.totalNumberOfDefaults ?? 0}</td>
-                                    <td style={{ textAlign: "right" }}>{formatCurrency(broker.totalCommissionAmount ?? 0)}</td>
-                                    <td className="action-cell">
-                                        <button className="btn btn-sm btn-success" onClick={() => startEdit(broker)} disabled={showForm}>Edit</button>
-                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(broker)} disabled={showForm}>Delete</button>
-                                    </td>
+                    {error && <div className="dialog-error">{error}</div>}
+
+                    <div className="dialog-body">
+                        <div className="dialog-toolbar">
+                            <button className="btn" onClick={startAdd} disabled={isAdding || showForm}>Add Broker</button>
+                        </div>
+
+                        <table className="dialog-table">
+                            <thead>
+                                <tr>
+                                    <th>Broker Name</th>
+                                    <th style={{ textAlign: "center" }}>Submissions</th>
+                                    <th style={{ textAlign: "center" }}>Approvals</th>
+                                    <th style={{ textAlign: "center" }}>Declines</th>
+                                    <th style={{ textAlign: "center" }}>Funded Deals</th>
+                                    <th style={{ textAlign: "right" }}>Total Funded</th>
+                                    <th style={{ textAlign: "right" }}>Defaults</th>
+                                    <th style={{ textAlign: "center" }}>Num. Defaults</th>
+                                    <th style={{ textAlign: "right" }}>Commission</th>
+                                    <th>Actions</th>
                                 </tr>
-                            ))}
-                            {brokers.length === 0 && (
-                                <tr><td colSpan={10} className="empty-row">No brokers found</td></tr>
-                            )}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {brokers.map((broker) => (
+                                    <tr key={broker._id} className={editingBroker?._id === broker._id ? "selected-row" : ""}>
+                                        <td>{broker.brokerName}</td>
+                                        <td style={{ textAlign: "center" }}>{broker.numberOfSubmissions ?? 0}</td>
+                                        <td style={{ textAlign: "center" }}>{broker.numberOfApprovals ?? 0}</td>
+                                        <td style={{ textAlign: "center" }}>{broker.numberOfDeclines ?? 0}</td>
+                                        <td style={{ textAlign: "center" }}>{broker.numberOfFundedDeals ?? 0}</td>
+                                        <td style={{ textAlign: "right" }}>{formatCurrency(broker.totalDollarAmountFunded ?? 0)}</td>
+                                        <td style={{ textAlign: "right" }}>{formatCurrency(broker.totalDollarAmountOfDefaults ?? 0)}</td>
+                                        <td style={{ textAlign: "center" }}>{broker.totalNumberOfDefaults ?? 0}</td>
+                                        <td style={{ textAlign: "right" }}>{formatCurrency(broker.totalCommissionAmount ?? 0)}</td>
+                                        <td className="action-cell">
+                                            <button className="btn btn-sm btn-success" onClick={() => startEdit(broker)} disabled={isAdding || showForm}>Edit</button>
+                                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(broker)} disabled={isAdding || showForm}>Delete</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {brokers.length === 0 && (
+                                    <tr><td colSpan={10} className="empty-row">No brokers found</td></tr>
+                                )}
+                            </tbody>
+                        </table>
 
-                    {showForm && (
-                        <div className="dialog-form">
-                            <h3>{isAdding ? "Add Broker" : "Edit Broker"}</h3>
-                            {formError && <div className="dialog-error">{formError}</div>}
+                    </div>
+                </div>
+            </div>
 
+            {showForm && (
+                <div className="dialog-overlay" style={{ zIndex: 2001 }}>
+                    <div className="dialog dialog-extra-wide">
+                        <div className="dialog-header">
+                            <h2>Edit Broker</h2>
+                            <button className="dialog-close" onClick={cancelForm}>&times;</button>
+                        </div>
+                        {formError && <div className="dialog-error">{formError}</div>}
+                        <div className="dialog-body">
                             <div className="form-row">
                                 <label>Broker Name</label>
                                 <input
@@ -213,7 +222,7 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                                 />
                             </div>
 
-                            {!isAdding && editingBroker && (
+                            {editingBroker && (
                                 <div style={{ marginTop: "1rem" }}>
                                     <h4 style={{ marginBottom: "0.5rem" }}>Statistics (read-only)</h4>
                                     <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}>
@@ -253,16 +262,40 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                                 </div>
                             )}
                         </div>
-                    )}
-                </div>
-
-                {showForm && (
-                    <div className="dialog-footer">
-                        <button className="btn btn-primary" onClick={handleSave}>Save</button>
-                        <button className="btn" onClick={cancelForm}>Cancel</button>
+                        <div className="dialog-footer">
+                            <button className="btn btn-primary" onClick={handleSave}>Save</button>
+                            <button className="btn" onClick={cancelForm}>Cancel</button>
+                        </div>
                     </div>
-                )}
-            </div>
-        </div>
+                </div>
+            )}
+
+            {isAdding && (
+                <div className="dialog-overlay" style={{ zIndex: 2001 }}>
+                    <div className="dialog">
+                        <div className="dialog-header">
+                            <h2>Add Broker</h2>
+                            <button className="dialog-close" onClick={cancelForm}>&times;</button>
+                        </div>
+                        {formError && <div className="dialog-error">{formError}</div>}
+                        <div className="dialog-body">
+                            <div className="form-row">
+                                <label>Broker Name</label>
+                                <input
+                                    type="text"
+                                    value={formData.brokerName}
+                                    onChange={(e) => setFormData({ brokerName: e.target.value })}
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+                        <div className="dialog-footer">
+                            <button className="btn btn-primary" onClick={handleSave}>Save</button>
+                            <button className="btn" onClick={cancelForm}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 }

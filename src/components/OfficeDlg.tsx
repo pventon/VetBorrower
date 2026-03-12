@@ -276,121 +276,153 @@ export default function OfficeDlg({ onClose }: OfficeDlgProps) {
         }
     };
 
-    const showForm = isAdding || editingOffice !== null;
+    const showForm = editingOffice !== null;
+
+    const formFields = (
+        <>
+            <div className="form-row">
+                <label>Office Name</label>
+                <input
+                    type="text"
+                    value={formData.officeName}
+                    onChange={(e) => setFormData({ ...formData, officeName: e.target.value })}
+                    autoFocus
+                />
+            </div>
+            <div className="form-row">
+                <label>Acronym</label>
+                <input
+                    type="text"
+                    value={formData.officeAcronym}
+                    onChange={(e) => setFormData({ ...formData, officeAcronym: e.target.value })}
+                />
+            </div>
+            <div className="form-row">
+                <label>Address</label>
+                <AddressSearch
+                    value={formData.address}
+                    onChange={(val) => setFormData({ ...formData, address: val })}
+                />
+            </div>
+            <div className="form-row">
+                <label>Email</label>
+                <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+            </div>
+            <div className="form-row">
+                <label>Phone</label>
+                <input
+                    type="text"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
+                />
+            </div>
+            <div className="form-row">
+                <label>Timezone</label>
+                <select
+                    value={formData.officeTimezone}
+                    onChange={(e) => setFormData({ ...formData, officeTimezone: e.target.value })}
+                >
+                    <option value="">-- Select Timezone --</option>
+                    {US_TIMEZONES.map((tz) => (
+                        <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    ))}
+                </select>
+            </div>
+        </>
+    );
 
     return (
-        <div className="dialog-overlay">
-            <div className="dialog dialog-extra-wide">
-                <div className="dialog-header">
-                    <h2>Offices</h2>
-                    <button className="dialog-close" onClick={onClose}>&times;</button>
-                </div>
-
-                {error && <div className="dialog-error">{error}</div>}
-
-                <div className="dialog-body">
-                    <div className="dialog-toolbar">
-                        <button className="btn" onClick={startAdd} disabled={showForm}>Add Office</button>
+        <>
+            <div className="dialog-overlay">
+                <div className="dialog dialog-extra-wide">
+                    <div className="dialog-header">
+                        <h2>Offices</h2>
+                        <button className="dialog-close" onClick={onClose}>&times;</button>
                     </div>
 
-                    <table className="dialog-table">
-                        <thead>
-                            <tr>
-                                <th>Acronym</th>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>Phone</th>
-                                <th>Timezone</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {offices.map((office) => (
-                                <tr key={office._id} className={editingOffice?._id === office._id ? "selected-row" : ""}>
-                                    <td>{office.officeAcronym}</td>
-                                    <td>{office.officeName}</td>
-                                    <td>{office.email}</td>
-                                    <td>{office.phone}</td>
-                                    <td>{office.officeTimezone}</td>
-                                    <td className="action-cell">
-                                        <button className="btn btn-sm btn-success" onClick={() => startEdit(office)} disabled={showForm}>Edit</button>
-                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(office)} disabled={showForm}>Delete</button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {offices.length === 0 && (
-                                <tr><td colSpan={6} className="empty-row">No offices found</td></tr>
-                            )}
-                        </tbody>
-                    </table>
+                    {error && <div className="dialog-error">{error}</div>}
 
-                    {showForm && (
-                        <div className="dialog-form">
-                            <h3>{isAdding ? "Add Office" : "Edit Office"}</h3>
-                            {formError && <div className="dialog-error">{formError}</div>}
-
-                            <div className="form-row">
-                                <label>Office Name</label>
-                                <input
-                                    type="text"
-                                    value={formData.officeName}
-                                    onChange={(e) => setFormData({ ...formData, officeName: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-row">
-                                <label>Acronym</label>
-                                <input
-                                    type="text"
-                                    value={formData.officeAcronym}
-                                    onChange={(e) => setFormData({ ...formData, officeAcronym: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-row">
-                                <label>Address</label>
-                                <AddressSearch
-                                    value={formData.address}
-                                    onChange={(val) => setFormData({ ...formData, address: val })}
-                                />
-                            </div>
-                            <div className="form-row">
-                                <label>Email</label>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-row">
-                                <label>Phone</label>
-                                <input
-                                    type="text"
-                                    value={formData.phone}
-                                    onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
-                                />
-                            </div>
-                            <div className="form-row">
-                                <label>Timezone</label>
-                                <select
-                                    value={formData.officeTimezone}
-                                    onChange={(e) => setFormData({ ...formData, officeTimezone: e.target.value })}
-                                >
-                                    <option value="">-- Select Timezone --</option>
-                                    {US_TIMEZONES.map((tz) => (
-                                        <option key={tz.value} value={tz.value}>{tz.label}</option>
-                                    ))}
-                                </select>
-                            </div>
+                    <div className="dialog-body">
+                        <div className="dialog-toolbar">
+                            <button className="btn" onClick={startAdd} disabled={isAdding || showForm}>Add Office</button>
                         </div>
-                    )}
-                </div>
 
-                {showForm && (
-                    <div className="dialog-footer">
-                        <button className="btn btn-primary" onClick={handleSave}>Save</button>
-                        <button className="btn" onClick={cancelForm}>Cancel</button>
+                        <table className="dialog-table">
+                            <thead>
+                                <tr>
+                                    <th>Acronym</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Timezone</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {offices.map((office) => (
+                                    <tr key={office._id} className={editingOffice?._id === office._id ? "selected-row" : ""}>
+                                        <td>{office.officeAcronym}</td>
+                                        <td>{office.officeName}</td>
+                                        <td>{office.email}</td>
+                                        <td>{office.phone}</td>
+                                        <td>{office.officeTimezone}</td>
+                                        <td className="action-cell">
+                                            <button className="btn btn-sm btn-success" onClick={() => startEdit(office)} disabled={isAdding || showForm}>Edit</button>
+                                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(office)} disabled={isAdding || showForm}>Delete</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {offices.length === 0 && (
+                                    <tr><td colSpan={6} className="empty-row">No offices found</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+
                     </div>
-                )}
+                </div>
             </div>
-        </div>
+
+            {showForm && (
+                <div className="dialog-overlay" style={{ zIndex: 2001 }}>
+                    <div className="dialog dialog-wide">
+                        <div className="dialog-header">
+                            <h2>Edit Office</h2>
+                            <button className="dialog-close" onClick={cancelForm}>&times;</button>
+                        </div>
+                        {formError && <div className="dialog-error">{formError}</div>}
+                        <div className="dialog-body">
+                            {formFields}
+                        </div>
+                        <div className="dialog-footer">
+                            <button className="btn btn-primary" onClick={handleSave}>Save</button>
+                            <button className="btn" onClick={cancelForm}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isAdding && (
+                <div className="dialog-overlay" style={{ zIndex: 2001 }}>
+                    <div className="dialog dialog-wide">
+                        <div className="dialog-header">
+                            <h2>Add Office</h2>
+                            <button className="dialog-close" onClick={cancelForm}>&times;</button>
+                        </div>
+                        {formError && <div className="dialog-error">{formError}</div>}
+                        <div className="dialog-body">
+                            {formFields}
+                        </div>
+                        <div className="dialog-footer">
+                            <button className="btn btn-primary" onClick={handleSave}>Save</button>
+                            <button className="btn" onClick={cancelForm}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 }

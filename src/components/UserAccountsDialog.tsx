@@ -190,136 +190,166 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
         }
     };
 
-    const showForm = isAdding || editingUser !== null;
+    const showForm = editingUser !== null;
+
+    const formFields = (isAddMode: boolean) => (
+        <>
+            <div className="form-row">
+                <label>Email</label>
+                <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    autoFocus
+                />
+            </div>
+            <div className="form-row">
+                <label>{isAddMode ? "Password" : "Password (leave blank to keep)"}</label>
+                <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                />
+            </div>
+            <div className="form-row">
+                <label>First Name</label>
+                <input
+                    type="text"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                />
+            </div>
+            <div className="form-row">
+                <label>Last Name</label>
+                <input
+                    type="text"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                />
+            </div>
+            <div className="form-row">
+                <label>Role</label>
+                <select
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                >
+                    {availableRoles.map((r) => (
+                        <option key={r.role} value={r.role}>{r.role}</option>
+                    ))}
+                </select>
+            </div>
+            <div className="form-row">
+                <label>Office</label>
+                <select
+                    value={formData.officeAcronym}
+                    onChange={(e) => setFormData({ ...formData, officeAcronym: e.target.value })}
+                >
+                    <option value="">-- Select Office --</option>
+                    {officeAcronyms.map((a) => (
+                        <option key={a} value={a}>{a}</option>
+                    ))}
+                </select>
+            </div>
+            <div className="form-row">
+                <label className="checkbox-label">
+                    <input
+                        type="checkbox"
+                        checked={formData.isActive}
+                        onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                    />
+                    Active
+                </label>
+            </div>
+        </>
+    );
 
     return (
-        <div className="dialog-overlay">
-            <div className="dialog">
-                <div className="dialog-header">
-                    <h2>User Accounts</h2>
-                    <button className="dialog-close" onClick={onClose}>&times;</button>
-                </div>
-
-                {error && <div className="dialog-error">{error}</div>}
-
-                <div className="dialog-body">
-                    <div className="dialog-toolbar">
-                        <button className="btn" onClick={startAdd} disabled={showForm}>Add User</button>
+        <>
+            <div className="dialog-overlay">
+                <div className="dialog">
+                    <div className="dialog-header">
+                        <h2>User Accounts</h2>
+                        <button className="dialog-close" onClick={onClose}>&times;</button>
                     </div>
 
-                    <table className="dialog-table">
-                        <thead>
-                            <tr>
-                                <th>Email</th>
-                                <th>Name</th>
-                                <th>Role</th>
-                                <th>Office</th>
-                                <th>Active</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {users.map((user) => (
-                                <tr key={user._id} className={editingUser?._id === user._id ? "selected-row" : ""}>
-                                    <td>{user.email}</td>
-                                    <td>{user.firstName} {user.lastName}</td>
-                                    <td>{user.role}</td>
-                                    <td>{user.officeAcronym}</td>
-                                    <td>{user.isActive ? "Yes" : "No"}</td>
-                                    <td className="action-cell">
-                                        <button className="btn btn-sm btn-success" onClick={() => startEdit(user)} disabled={showForm}>Edit</button>
-                                        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(user)} disabled={showForm || user.email === DEFAULT_ADMIN_EMAIL}>Delete</button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {users.length === 0 && (
-                                <tr><td colSpan={6} className="empty-row">No user accounts found</td></tr>
-                            )}
-                        </tbody>
-                    </table>
+                    {error && <div className="dialog-error">{error}</div>}
 
-                    {showForm && (
-                        <div className="dialog-form">
-                            <h3>{isAdding ? "Add User" : "Edit User"}</h3>
-                            {formError && <div className="dialog-error">{formError}</div>}
-
-                            <div className="form-row">
-                                <label>Email</label>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-row">
-                                <label>{isAdding ? "Password" : "Password (leave blank to keep)"}</label>
-                                <input
-                                    type="password"
-                                    value={formData.password}
-                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-row">
-                                <label>First Name</label>
-                                <input
-                                    type="text"
-                                    value={formData.firstName}
-                                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-row">
-                                <label>Last Name</label>
-                                <input
-                                    type="text"
-                                    value={formData.lastName}
-                                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-row">
-                                <label>Role</label>
-                                <select
-                                    value={formData.role}
-                                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                >
-                                    {availableRoles.map((r) => (
-                                        <option key={r.role} value={r.role}>{r.role}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="form-row">
-                                <label>Office</label>
-                                <select
-                                    value={formData.officeAcronym}
-                                    onChange={(e) => setFormData({ ...formData, officeAcronym: e.target.value })}
-                                >
-                                    <option value="">-- Select Office --</option>
-                                    {officeAcronyms.map((a) => (
-                                        <option key={a} value={a}>{a}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="form-row">
-                                <label className="checkbox-label">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.isActive}
-                                        onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                                    />
-                                    Active
-                                </label>
-                            </div>
-
+                    <div className="dialog-body">
+                        <div className="dialog-toolbar">
+                            <button className="btn" onClick={startAdd} disabled={isAdding || showForm}>Add User</button>
                         </div>
-                    )}
-                </div>
 
-                {showForm && (
-                    <div className="dialog-footer">
-                        <button className="btn btn-primary" onClick={handleSave}>Save</button>
-                        <button className="btn" onClick={cancelForm}>Cancel</button>
+                        <table className="dialog-table">
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Name</th>
+                                    <th>Role</th>
+                                    <th>Office</th>
+                                    <th>Active</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {users.map((user) => (
+                                    <tr key={user._id} className={editingUser?._id === user._id ? "selected-row" : ""}>
+                                        <td>{user.email}</td>
+                                        <td>{user.firstName} {user.lastName}</td>
+                                        <td>{user.role}</td>
+                                        <td>{user.officeAcronym}</td>
+                                        <td>{user.isActive ? "Yes" : "No"}</td>
+                                        <td className="action-cell">
+                                            <button className="btn btn-sm btn-success" onClick={() => startEdit(user)} disabled={isAdding || showForm}>Edit</button>
+                                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(user)} disabled={isAdding || showForm || user.email === DEFAULT_ADMIN_EMAIL}>Delete</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {users.length === 0 && (
+                                    <tr><td colSpan={6} className="empty-row">No user accounts found</td></tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
-                )}
+                </div>
             </div>
-        </div>
+
+            {showForm && (
+                <div className="dialog-overlay" style={{ zIndex: 2001 }}>
+                    <div className="dialog">
+                        <div className="dialog-header">
+                            <h2>Edit User</h2>
+                            <button className="dialog-close" onClick={cancelForm}>&times;</button>
+                        </div>
+                        {formError && <div className="dialog-error">{formError}</div>}
+                        <div className="dialog-body">
+                            {formFields(false)}
+                        </div>
+                        <div className="dialog-footer">
+                            <button className="btn btn-primary" onClick={handleSave}>Save</button>
+                            <button className="btn" onClick={cancelForm}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isAdding && (
+                <div className="dialog-overlay" style={{ zIndex: 2001 }}>
+                    <div className="dialog">
+                        <div className="dialog-header">
+                            <h2>Add User</h2>
+                            <button className="dialog-close" onClick={cancelForm}>&times;</button>
+                        </div>
+                        {formError && <div className="dialog-error">{formError}</div>}
+                        <div className="dialog-body">
+                            {formFields(true)}
+                        </div>
+                        <div className="dialog-footer">
+                            <button className="btn btn-primary" onClick={handleSave}>Save</button>
+                            <button className="btn" onClick={cancelForm}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 }

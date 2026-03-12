@@ -300,7 +300,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         return (owed > 0 ? owed : 0).toFixed(2);
     };
 
-    const showForm = isAdding || editingDeal !== null;
+    const showForm = editingDeal !== null;
 
     const field = (label: string, key: keyof DealFormData, type = "text", prefix?: string) => (
         <div className="form-row">
@@ -328,7 +328,313 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         </div>
     );
 
+    const formGrid = (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0 1rem" }}>
+            {/* Row 1: Broker | Type of Deal | Position | MCA History */}
+            <div className="form-row">
+                <label>Broker</label>
+                <select
+                    value={formData.broker}
+                    onChange={(e) => setFormData({ ...formData, broker: e.target.value })}
+                >
+                    <option value="">-- None --</option>
+                    {brokers.map((b) => (
+                        <option key={b._id} value={b._id}>{b.brokerName}</option>
+                    ))}
+                </select>
+            </div>
+            <div className="form-row">
+                <label>Type of Deal</label>
+                <select
+                    value={formData.typeOfDeal}
+                    onChange={(e) => setFormData({ ...formData, typeOfDeal: e.target.value })}
+                >
+                    <option value="new">New</option>
+                    <option value="renewal">Renewal</option>
+                </select>
+            </div>
+            {field("Position", "position")}
+            <div className="form-row">
+                <label>MCA History</label>
+                <select
+                    value={formData.mcaHistory}
+                    onChange={(e) => setFormData({ ...formData, mcaHistory: e.target.value })}
+                >
+                    <option value="">-- Select --</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                </select>
+            </div>
+
+            {/* Row 2: Funded Date | Funded Amount | Origination Fee | Net Funded Amount */}
+            {field("Funded Date", "fundedDate", "date")}
+            <div className="form-row">
+                <label>Funded Amount</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={formData.fundedAmount}
+                        onChange={(e) => {
+                            const funded = e.target.value;
+                            const fundedNum = parseFloat(funded);
+                            const feeNum = parseFloat(formData.originationFee);
+                            const net = funded !== "" && formData.originationFee !== ""
+                                ? (fundedNum - feeNum).toFixed(2)
+                                : funded !== "" ? parseFloat(funded).toFixed(2) : "";
+                            const pct = funded !== "" && formData.originationFee !== "" && fundedNum !== 0
+                                ? ((feeNum / fundedNum) * 100).toFixed(2)
+                                : formData.originationFeePercent;
+                            const commission = funded !== "" && formData.brokerFee !== ""
+                                ? ((parseFloat(formData.brokerFee) / 100) * fundedNum).toFixed(2)
+                                : formData.brokerCommission;
+                            const total = calcTotalPayback(funded, formData.factorRate);
+                            const weekly = formData.weeklyOrDailyPayment === "true";
+                            const payment = calcPayment(total, formData.loanTerm, weekly);
+                            const owed = formData.hasDefaulted ? calcAmountOwed(funded, formData.defaultDate, payment, total, weekly) : "";
+                            setFormData({ ...formData, fundedAmount: funded, netFundedAmount: net, originationFeePercent: pct, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
+                        }}
+                        onBlur={(e) => {
+                            const v = parseFloat(e.target.value);
+                            if (!isNaN(v)) setFormData((f) => ({ ...f, fundedAmount: v.toFixed(2) }));
+                        }}
+                    />
+                </div>
+            </div>
+            <div className="form-row">
+                <label>Origination Fee</label>
+                <div style={{ display: "flex", gap: "0.4rem" }}>
+                    <div className="input-prefixed" style={{ flex: 1 }}>
+                        <span className="input-prefix-symbol">%</span>
+                        <input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={formData.originationFeePercent}
+                            onChange={(e) => {
+                                const pct = e.target.value;
+                                const pctNum = parseFloat(pct);
+                                const fundedNum = parseFloat(formData.fundedAmount);
+                                const fee = pct !== "" && formData.fundedAmount !== ""
+                                    ? ((pctNum / 100) * fundedNum).toFixed(2)
+                                    : formData.originationFee;
+                                const net = fee !== "" && formData.fundedAmount !== ""
+                                    ? (fundedNum - parseFloat(fee)).toFixed(2)
+                                    : formData.netFundedAmount;
+                                setFormData({ ...formData, originationFeePercent: pct, originationFee: fee, netFundedAmount: net });
+                            }}
+                        />
+                    </div>
+                    <div className="input-prefixed" style={{ flex: 1 }}>
+                        <span className="input-prefix-symbol">$</span>
+                        <input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={formData.originationFee}
+                            onChange={(e) => {
+                                const fee = e.target.value;
+                                const feeNum = parseFloat(fee);
+                                const fundedNum = parseFloat(formData.fundedAmount);
+                                const pct = fee !== "" && formData.fundedAmount !== "" && fundedNum !== 0
+                                    ? ((feeNum / fundedNum) * 100).toFixed(2)
+                                    : formData.originationFeePercent;
+                                const net = fee !== "" && formData.fundedAmount !== ""
+                                    ? (fundedNum - feeNum).toFixed(2)
+                                    : formData.fundedAmount !== "" ? parseFloat(formData.fundedAmount).toFixed(2) : "";
+                                setFormData({ ...formData, originationFee: fee, originationFeePercent: pct, netFundedAmount: net });
+                            }}
+                            onBlur={(e) => {
+                                const v = parseFloat(e.target.value);
+                                if (!isNaN(v)) setFormData((f) => ({ ...f, originationFee: v.toFixed(2) }));
+                            }}
+                        />
+                    </div>
+                </div>
+            </div>
+            <div className="form-row">
+                <label>Net Funded Amount</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input type="number" step="0.01" value={formData.netFundedAmount} disabled />
+                </div>
+            </div>
+
+            {/* Row 3: Buy Rate | Broker Fee | Broker Commission | Factor Rate */}
+            <div className="form-row">
+                <label>Buy Rate</label>
+                <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={formData.buyRate}
+                    onChange={(e) => {
+                        const buy = e.target.value;
+                        const buyNum = parseFloat(buy);
+                        const feeNum = parseFloat(formData.brokerFee);
+                        const factor = buy !== "" && formData.brokerFee !== ""
+                            ? (buyNum + feeNum / 100).toFixed(2)
+                            : buy !== "" ? buy : "";
+                        const total = calcTotalPayback(formData.fundedAmount, factor);
+                        const weekly = formData.weeklyOrDailyPayment === "true";
+                        const payment = calcPayment(total, formData.loanTerm, weekly);
+                        const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, total, weekly) : "";
+                        setFormData({ ...formData, buyRate: buy, factorRate: factor, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
+                    }}
+                />
+            </div>
+            <div className="form-row">
+                <label>Broker Fee</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">%</span>
+                    <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={formData.brokerFee}
+                        onChange={(e) => {
+                            const fee = e.target.value;
+                            const feeNum = parseFloat(fee);
+                            const buyNum = parseFloat(formData.buyRate);
+                            const factor = fee !== "" && formData.buyRate !== ""
+                                ? (buyNum + feeNum / 100).toFixed(2)
+                                : formData.buyRate !== "" ? formData.buyRate : "";
+                            const commission = fee !== "" && formData.fundedAmount !== ""
+                                ? ((feeNum / 100) * parseFloat(formData.fundedAmount)).toFixed(2)
+                                : formData.brokerCommission;
+                            const total = calcTotalPayback(formData.fundedAmount, factor);
+                            const weekly = formData.weeklyOrDailyPayment === "true";
+                            const payment = calcPayment(total, formData.loanTerm, weekly);
+                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, total, weekly) : "";
+                            setFormData({ ...formData, brokerFee: fee, factorRate: factor, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
+                        }}
+                    />
+                </div>
+            </div>
+            <div className="form-row">
+                <label>Broker Commission</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input type="number" step="0.01" value={formData.brokerCommission} disabled />
+                </div>
+            </div>
+            <div className="form-row">
+                <label>Factor Rate</label>
+                <input type="number" step="0.01" value={formData.factorRate} disabled />
+            </div>
+
+            {/* Row 4: Payment Frequency | Loan Term | Total Payback | Payment Amount */}
+            <div className="form-row">
+                <label>Payment Frequency</label>
+                <select
+                    value={formData.weeklyOrDailyPayment}
+                    onChange={(e) => {
+                        const weekly = e.target.value === "true";
+                        const payment = calcPayment(formData.totalPaybackAmount, formData.loanTerm, weekly);
+                        const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, formData.totalPaybackAmount, weekly) : "";
+                        setFormData({ ...formData, weeklyOrDailyPayment: e.target.value, paymentAmount: payment, amountOwedAsOfDefault: owed });
+                    }}
+                >
+                    <option value="false">Daily</option>
+                    <option value="true">Weekly</option>
+                </select>
+            </div>
+            <div className="form-row">
+                <label>Loan Term (days)</label>
+                <input
+                    type="number"
+                    step="1"
+                    placeholder="0"
+                    value={formData.loanTerm}
+                    onChange={(e) => {
+                        const term = e.target.value;
+                        const weekly = formData.weeklyOrDailyPayment === "true";
+                        const payment = calcPayment(formData.totalPaybackAmount, term, weekly);
+                        const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, formData.totalPaybackAmount, weekly) : "";
+                        setFormData({ ...formData, loanTerm: term, paymentAmount: payment, amountOwedAsOfDefault: owed });
+                    }}
+                />
+            </div>
+            <div className="form-row">
+                <label>Total Payback</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input type="number" step="0.01" value={formData.totalPaybackAmount} disabled />
+                </div>
+            </div>
+            <div className="form-row">
+                <label>Payment Amount</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input type="number" step="0.01" value={formData.paymentAmount} disabled />
+                </div>
+            </div>
+
+            {/* Row 5: Default Date/Days | Amount Owed as of Default | (empty) | Renewal Date */}
+            <div className="form-row">
+                <label>Default Date / Days</label>
+                <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                    <input
+                        type="checkbox"
+                        style={{ width: "auto", flexShrink: 0 }}
+                        checked={formData.hasDefaulted}
+                        onChange={(e) => {
+                            const checked = e.target.checked;
+                            const owed = checked ? calcAmountOwed(formData.fundedDate, formData.defaultDate, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
+                            setFormData({ ...formData, hasDefaulted: checked, amountOwedAsOfDefault: owed });
+                        }}
+                    />
+                    <input
+                        type="date"
+                        style={{ flex: 2 }}
+                        value={formData.defaultDate}
+                        disabled={!formData.hasDefaulted}
+                        onChange={(e) => {
+                            const dateVal = e.target.value;
+                            let days = "";
+                            if (dateVal && formData.fundedDate) {
+                                const diff = parseDateUTC(dateVal) - parseDateUTC(formData.fundedDate);
+                                days = Math.floor(diff / 86400000).toString();
+                            }
+                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, dateVal, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
+                            setFormData({ ...formData, defaultDate: dateVal, defaultDays: days, amountOwedAsOfDefault: owed });
+                        }}
+                    />
+                    <input
+                        type="number"
+                        style={{ flex: 1, minWidth: 0 }}
+                        placeholder="Days"
+                        value={formData.defaultDays}
+                        disabled={!formData.hasDefaulted}
+                        onChange={(e) => {
+                            const daysVal = e.target.value;
+                            let dateStr = "";
+                            if (daysVal !== "" && formData.fundedDate) {
+                                const ms = parseDateUTC(formData.fundedDate) + parseInt(daysVal) * 86400000;
+                                dateStr = new Date(ms).toISOString().split("T")[0];
+                            }
+                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, dateStr, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
+                            setFormData({ ...formData, defaultDays: daysVal, defaultDate: dateStr, amountOwedAsOfDefault: owed });
+                        }}
+                    />
+                </div>
+            </div>
+            <div className="form-row">
+                <label>Amount Owed as of Default</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input type="number" step="0.01" value={formData.amountOwedAsOfDefault} disabled />
+                </div>
+            </div>
+            <div />
+            {field("Renewal Date", "renewalDate", "date")}
+        </div>
+    );
+
     return (
+        <>
         <div className="dialog-overlay">
             <div className="dialog dialog-extra-wide">
                 <div className="dialog-header">
@@ -345,7 +651,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             value={selectedCorpId}
                             onChange={(e) => handleCorpChange(e.target.value)}
                             style={{ flex: 1 }}
-                            disabled={showForm}
+                            disabled={isAdding || showForm}
                         >
                             <option value="">-- Select Corporation --</option>
                             {corporations.map((c) => (
@@ -354,7 +660,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 </option>
                             ))}
                         </select>
-                        <button className="btn" onClick={startAdd} disabled={!selectedCorpId || showForm}>
+                        <button className="btn" onClick={startAdd} disabled={!selectedCorpId || isAdding || showForm}>
                             Add Deal
                         </button>
                     </div>
@@ -386,8 +692,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         <td>{deal.factorRate ?? "-"}</td>
                                         <td>{formatCurrency(deal.totalPaybackAmount)}</td>
                                         <td className="action-cell">
-                                            <button className="btn btn-sm btn-success" onClick={() => startEdit(deal)} disabled={showForm}>Edit</button>
-                                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(deal)} disabled={showForm}>Delete</button>
+                                            <button className="btn btn-sm btn-success" onClick={() => startEdit(deal)} disabled={isAdding || showForm}>Edit</button>
+                                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(deal)} disabled={isAdding || showForm}>Delete</button>
                                         </td>
                                     </tr>
                                 ))}
@@ -398,324 +704,51 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         </table>
                     )}
 
-                    {showForm && (
-                        <div className="dialog-form">
-                            <h3>{isAdding ? "Add Deal" : "Edit Deal"}</h3>
-                            {formError && <div className="dialog-error">{formError}</div>}
-
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0 1rem" }}>
-                                {/* Row 1: Broker | Type of Deal | Position | MCA History */}
-                                <div className="form-row">
-                                    <label>Broker</label>
-                                    <select
-                                        value={formData.broker}
-                                        onChange={(e) => setFormData({ ...formData, broker: e.target.value })}
-                                    >
-                                        <option value="">-- None --</option>
-                                        {brokers.map((b) => (
-                                            <option key={b._id} value={b._id}>{b.brokerName}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-row">
-                                    <label>Type of Deal</label>
-                                    <select
-                                        value={formData.typeOfDeal}
-                                        onChange={(e) => setFormData({ ...formData, typeOfDeal: e.target.value })}
-                                    >
-                                        <option value="new">New</option>
-                                        <option value="renewal">Renewal</option>
-                                    </select>
-                                </div>
-                                {field("Position", "position")}
-                                <div className="form-row">
-                                    <label>MCA History</label>
-                                    <select
-                                        value={formData.mcaHistory}
-                                        onChange={(e) => setFormData({ ...formData, mcaHistory: e.target.value })}
-                                    >
-                                        <option value="">-- Select --</option>
-                                        <option value="Yes">Yes</option>
-                                        <option value="No">No</option>
-                                    </select>
-                                </div>
-
-                                {/* Row 2: Funded Date | Funded Amount | Origination Fee | Net Funded Amount */}
-                                {field("Funded Date", "fundedDate", "date")}
-                                <div className="form-row">
-                                    <label>Funded Amount</label>
-                                    <div className="input-prefixed">
-                                        <span className="input-prefix-symbol">$</span>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="0.00"
-                                            value={formData.fundedAmount}
-                                            onChange={(e) => {
-                                                const funded = e.target.value;
-                                                const fundedNum = parseFloat(funded);
-                                                const feeNum = parseFloat(formData.originationFee);
-                                                const net = funded !== "" && formData.originationFee !== ""
-                                                    ? (fundedNum - feeNum).toFixed(2)
-                                                    : funded !== "" ? parseFloat(funded).toFixed(2) : "";
-                                                const pct = funded !== "" && formData.originationFee !== "" && fundedNum !== 0
-                                                    ? ((feeNum / fundedNum) * 100).toFixed(2)
-                                                    : formData.originationFeePercent;
-                                                const commission = funded !== "" && formData.brokerFee !== ""
-                                                    ? ((parseFloat(formData.brokerFee) / 100) * fundedNum).toFixed(2)
-                                                    : formData.brokerCommission;
-                                                const total = calcTotalPayback(funded, formData.factorRate);
-                                                const weekly = formData.weeklyOrDailyPayment === "true";
-                                                const payment = calcPayment(total, formData.loanTerm, weekly);
-                                                const owed = formData.hasDefaulted ? calcAmountOwed(funded, formData.defaultDate, payment, total, weekly) : "";
-                                                setFormData({ ...formData, fundedAmount: funded, netFundedAmount: net, originationFeePercent: pct, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
-                                            }}
-                                            onBlur={(e) => {
-                                                const v = parseFloat(e.target.value);
-                                                if (!isNaN(v)) setFormData((f) => ({ ...f, fundedAmount: v.toFixed(2) }));
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="form-row">
-                                    <label>Origination Fee</label>
-                                    <div style={{ display: "flex", gap: "0.4rem" }}>
-                                        <div className="input-prefixed" style={{ flex: 1 }}>
-                                            <span className="input-prefix-symbol">%</span>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                placeholder="0.00"
-                                                value={formData.originationFeePercent}
-                                                onChange={(e) => {
-                                                    const pct = e.target.value;
-                                                    const pctNum = parseFloat(pct);
-                                                    const fundedNum = parseFloat(formData.fundedAmount);
-                                                    const fee = pct !== "" && formData.fundedAmount !== ""
-                                                        ? ((pctNum / 100) * fundedNum).toFixed(2)
-                                                        : formData.originationFee;
-                                                    const net = fee !== "" && formData.fundedAmount !== ""
-                                                        ? (fundedNum - parseFloat(fee)).toFixed(2)
-                                                        : formData.netFundedAmount;
-                                                    setFormData({ ...formData, originationFeePercent: pct, originationFee: fee, netFundedAmount: net });
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="input-prefixed" style={{ flex: 1 }}>
-                                            <span className="input-prefix-symbol">$</span>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                placeholder="0.00"
-                                                value={formData.originationFee}
-                                                onChange={(e) => {
-                                                    const fee = e.target.value;
-                                                    const feeNum = parseFloat(fee);
-                                                    const fundedNum = parseFloat(formData.fundedAmount);
-                                                    const pct = fee !== "" && formData.fundedAmount !== "" && fundedNum !== 0
-                                                        ? ((feeNum / fundedNum) * 100).toFixed(2)
-                                                        : formData.originationFeePercent;
-                                                    const net = fee !== "" && formData.fundedAmount !== ""
-                                                        ? (fundedNum - feeNum).toFixed(2)
-                                                        : formData.fundedAmount !== "" ? parseFloat(formData.fundedAmount).toFixed(2) : "";
-                                                    setFormData({ ...formData, originationFee: fee, originationFeePercent: pct, netFundedAmount: net });
-                                                }}
-                                                onBlur={(e) => {
-                                                    const v = parseFloat(e.target.value);
-                                                    if (!isNaN(v)) setFormData((f) => ({ ...f, originationFee: v.toFixed(2) }));
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="form-row">
-                                    <label>Net Funded Amount</label>
-                                    <div className="input-prefixed">
-                                        <span className="input-prefix-symbol">$</span>
-                                        <input type="number" step="0.01" value={formData.netFundedAmount} disabled />
-                                    </div>
-                                </div>
-
-                                {/* Row 3: Buy Rate | Broker Fee | Broker Commission | Factor Rate */}
-                                <div className="form-row">
-                                    <label>Buy Rate</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.buyRate}
-                                        onChange={(e) => {
-                                            const buy = e.target.value;
-                                            const buyNum = parseFloat(buy);
-                                            const feeNum = parseFloat(formData.brokerFee);
-                                            const factor = buy !== "" && formData.brokerFee !== ""
-                                                ? (buyNum + feeNum / 100).toFixed(2)
-                                                : buy !== "" ? buy : "";
-                                            const total = calcTotalPayback(formData.fundedAmount, factor);
-                                            const weekly = formData.weeklyOrDailyPayment === "true";
-                                            const payment = calcPayment(total, formData.loanTerm, weekly);
-                                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, total, weekly) : "";
-                                            setFormData({ ...formData, buyRate: buy, factorRate: factor, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
-                                        }}
-                                    />
-                                </div>
-                                <div className="form-row">
-                                    <label>Broker Fee</label>
-                                    <div className="input-prefixed">
-                                        <span className="input-prefix-symbol">%</span>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="0.00"
-                                            value={formData.brokerFee}
-                                            onChange={(e) => {
-                                                const fee = e.target.value;
-                                                const feeNum = parseFloat(fee);
-                                                const buyNum = parseFloat(formData.buyRate);
-                                                const factor = fee !== "" && formData.buyRate !== ""
-                                                    ? (buyNum + feeNum / 100).toFixed(2)
-                                                    : formData.buyRate !== "" ? formData.buyRate : "";
-                                                const commission = fee !== "" && formData.fundedAmount !== ""
-                                                    ? ((feeNum / 100) * parseFloat(formData.fundedAmount)).toFixed(2)
-                                                    : formData.brokerCommission;
-                                                const total = calcTotalPayback(formData.fundedAmount, factor);
-                                                const weekly = formData.weeklyOrDailyPayment === "true";
-                                                const payment = calcPayment(total, formData.loanTerm, weekly);
-                                                const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, total, weekly) : "";
-                                                setFormData({ ...formData, brokerFee: fee, factorRate: factor, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="form-row">
-                                    <label>Broker Commission</label>
-                                    <div className="input-prefixed">
-                                        <span className="input-prefix-symbol">$</span>
-                                        <input type="number" step="0.01" value={formData.brokerCommission} disabled />
-                                    </div>
-                                </div>
-                                <div className="form-row">
-                                    <label>Factor Rate</label>
-                                    <input type="number" step="0.01" value={formData.factorRate} disabled />
-                                </div>
-
-                                {/* Row 4: Payment Frequency | Loan Term | Total Payback | Payment Amount */}
-                                <div className="form-row">
-                                    <label>Payment Frequency</label>
-                                    <select
-                                        value={formData.weeklyOrDailyPayment}
-                                        onChange={(e) => {
-                                            const weekly = e.target.value === "true";
-                                            const payment = calcPayment(formData.totalPaybackAmount, formData.loanTerm, weekly);
-                                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, formData.totalPaybackAmount, weekly) : "";
-                                            setFormData({ ...formData, weeklyOrDailyPayment: e.target.value, paymentAmount: payment, amountOwedAsOfDefault: owed });
-                                        }}
-                                    >
-                                        <option value="false">Daily</option>
-                                        <option value="true">Weekly</option>
-                                    </select>
-                                </div>
-                                <div className="form-row">
-                                    <label>Loan Term (days)</label>
-                                    <input
-                                        type="number"
-                                        step="1"
-                                        placeholder="0"
-                                        value={formData.loanTerm}
-                                        onChange={(e) => {
-                                            const term = e.target.value;
-                                            const weekly = formData.weeklyOrDailyPayment === "true";
-                                            const payment = calcPayment(formData.totalPaybackAmount, term, weekly);
-                                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, formData.totalPaybackAmount, weekly) : "";
-                                            setFormData({ ...formData, loanTerm: term, paymentAmount: payment, amountOwedAsOfDefault: owed });
-                                        }}
-                                    />
-                                </div>
-                                <div className="form-row">
-                                    <label>Total Payback</label>
-                                    <div className="input-prefixed">
-                                        <span className="input-prefix-symbol">$</span>
-                                        <input type="number" step="0.01" value={formData.totalPaybackAmount} disabled />
-                                    </div>
-                                </div>
-                                <div className="form-row">
-                                    <label>Payment Amount</label>
-                                    <div className="input-prefixed">
-                                        <span className="input-prefix-symbol">$</span>
-                                        <input type="number" step="0.01" value={formData.paymentAmount} disabled />
-                                    </div>
-                                </div>
-
-                                {/* Row 5: Default Date/Days | Amount Owed as of Default | (empty) | Renewal Date */}
-                                <div className="form-row">
-                                    <label>Default Date / Days</label>
-                                    <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                                        <input
-                                            type="checkbox"
-                                            style={{ width: "auto", flexShrink: 0 }}
-                                            checked={formData.hasDefaulted}
-                                            onChange={(e) => {
-                                                const checked = e.target.checked;
-                                                const owed = checked ? calcAmountOwed(formData.fundedDate, formData.defaultDate, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
-                                                setFormData({ ...formData, hasDefaulted: checked, amountOwedAsOfDefault: owed });
-                                            }}
-                                        />
-                                        <input
-                                            type="date"
-                                            style={{ flex: 2 }}
-                                            value={formData.defaultDate}
-                                            disabled={!formData.hasDefaulted}
-                                            onChange={(e) => {
-                                                const dateVal = e.target.value;
-                                                let days = "";
-                                                if (dateVal && formData.fundedDate) {
-                                                    const diff = parseDateUTC(dateVal) - parseDateUTC(formData.fundedDate);
-                                                    days = Math.floor(diff / 86400000).toString();
-                                                }
-                                                const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, dateVal, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
-                                                setFormData({ ...formData, defaultDate: dateVal, defaultDays: days, amountOwedAsOfDefault: owed });
-                                            }}
-                                        />
-                                        <input
-                                            type="number"
-                                            style={{ flex: 1, minWidth: 0 }}
-                                            placeholder="Days"
-                                            value={formData.defaultDays}
-                                            disabled={!formData.hasDefaulted}
-                                            onChange={(e) => {
-                                                const daysVal = e.target.value;
-                                                let dateStr = "";
-                                                if (daysVal !== "" && formData.fundedDate) {
-                                                    const ms = parseDateUTC(formData.fundedDate) + parseInt(daysVal) * 86400000;
-                                                    dateStr = new Date(ms).toISOString().split("T")[0];
-                                                }
-                                                const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, dateStr, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
-                                                setFormData({ ...formData, defaultDays: daysVal, defaultDate: dateStr, amountOwedAsOfDefault: owed });
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="form-row">
-                                    <label>Amount Owed as of Default</label>
-                                    <div className="input-prefixed">
-                                        <span className="input-prefix-symbol">$</span>
-                                        <input type="number" step="0.01" value={formData.amountOwedAsOfDefault} disabled />
-                                    </div>
-                                </div>
-                                <div />
-                                {field("Renewal Date", "renewalDate", "date")}
-                            </div>
-                        </div>
-                    )}
                 </div>
+            </div>
+        </div>
 
-                {showForm && (
+        {showForm && (
+            <div className="dialog-overlay" style={{ zIndex: 2001 }}>
+                <div className="dialog dialog-extra-wide">
+                    <div className="dialog-header">
+                        <h2>Edit Deal</h2>
+                        <button className="dialog-close" onClick={cancelForm}>&times;</button>
+                    </div>
+                    {formError && <div className="dialog-error">{formError}</div>}
+                    <div className="dialog-body">
+                        <div className="dialog-form">
+                            {formGrid}
+                        </div>
+                    </div>
                     <div className="dialog-footer">
                         <button className="btn btn-primary" onClick={handleSave}>Save</button>
                         <button className="btn" onClick={cancelForm}>Cancel</button>
                     </div>
-                )}
+                </div>
             </div>
-        </div>
+        )}
+
+        {isAdding && (
+            <div className="dialog-overlay" style={{ zIndex: 2001 }}>
+                <div className="dialog dialog-extra-wide">
+                    <div className="dialog-header">
+                        <h2>Add Deal</h2>
+                        <button className="dialog-close" onClick={cancelForm}>&times;</button>
+                    </div>
+                    {formError && <div className="dialog-error">{formError}</div>}
+                    <div className="dialog-body">
+                        <div className="dialog-form">
+                            {formGrid}
+                        </div>
+                    </div>
+                    <div className="dialog-footer">
+                        <button className="btn btn-primary" onClick={handleSave}>Save</button>
+                        <button className="btn" onClick={cancelForm}>Cancel</button>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 }
