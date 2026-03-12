@@ -646,7 +646,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
                 <div className="dialog-body">
                     <div className="dialog-toolbar" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                        <label style={{ margin: 0 }}>Corporation:</label>
+                        <label style={{ margin: 0 }}>Funded Client:</label>
                         <select
                             value={selectedCorpId}
                             onChange={(e) => handleCorpChange(e.target.value)}
