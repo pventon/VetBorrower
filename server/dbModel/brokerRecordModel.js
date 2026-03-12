@@ -25,6 +25,7 @@ const brokerSchema = new mongoose.Schema({
   numberOfFundedDeals: Number,
   totalDollarAmountFunded: Number,
   totalDollarAmountOfDefaults: Number,
+  totalNumberOfDefaults: Number,
   totalCommissionAmount: Number
 
 }, {

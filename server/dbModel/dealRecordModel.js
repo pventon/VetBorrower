@@ -38,7 +38,9 @@ const dealSchema = new mongoose.Schema({
   brokerFee: Number,
   brokerCommission: Number,
   totalPaybackAmount: Number,
-  
+  hasDefaulted: Boolean,
+  amountOwedAsOfDefault: Number,
+
 }, {
   collection: "deals"              // Explicitly set the collection name
 });

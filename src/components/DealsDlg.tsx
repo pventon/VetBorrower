@@ -49,6 +49,8 @@ interface DealFormData {
     brokerFee: string;
     brokerCommission: string;
     totalPaybackAmount: string;
+    hasDefaulted: boolean;
+    amountOwedAsOfDefault: string;
 }
 
 const emptyForm: DealFormData = {
@@ -72,6 +74,8 @@ const emptyForm: DealFormData = {
     brokerFee: "",
     brokerCommission: "",
     totalPaybackAmount: "",
+    hasDefaulted: false,
+    amountOwedAsOfDefault: "",
 };
 
 function formatCurrency(value: number | undefined): string {
@@ -82,6 +86,11 @@ function formatCurrency(value: number | undefined): string {
 function formatDate(value: string | undefined): string {
     if (!value) return "-";
     return new Date(value).toLocaleDateString("en-US");
+}
+
+function parseDateUTC(dateStr: string): number {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
 }
 
 function toDateInput(value: string | undefined): string {
@@ -187,6 +196,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             totalPaybackAmount: deal.fundedAmount != null && deal.factorRate != null
                 ? (deal.fundedAmount * deal.factorRate).toFixed(2)
                 : deal.totalPaybackAmount?.toFixed(2) ?? "",
+            hasDefaulted: deal.hasDefaulted ?? false,
+            amountOwedAsOfDefault: deal.amountOwedAsOfDefault?.toFixed(2) ?? "",
         });
         setFormError(null);
     };
@@ -223,6 +234,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             brokerFee: formData.brokerFee ? parseFloat(formData.brokerFee) : null,
             brokerCommission: formData.brokerCommission ? parseFloat(formData.brokerCommission) : null,
             totalPaybackAmount: formData.totalPaybackAmount ? parseFloat(formData.totalPaybackAmount) : null,
+            hasDefaulted: formData.hasDefaulted,
+            amountOwedAsOfDefault: formData.amountOwedAsOfDefault ? parseFloat(formData.amountOwedAsOfDefault) : null,
         };
 
         try {
@@ -275,6 +288,18 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         return "";
     };
 
+    const calcAmountOwed = (fundedDate: string, defaultDate: string, paymentAmount: string, totalPayback: string, weekly: boolean): string => {
+        if (!fundedDate || !defaultDate || !paymentAmount || !totalPayback) return "";
+        const days = Math.floor((parseDateUTC(defaultDate) - parseDateUTC(fundedDate)) / 86400000);
+        if (days <= 0) return "";
+        const pmtNum = parseFloat(paymentAmount);
+        const totalNum = parseFloat(totalPayback);
+        if (isNaN(pmtNum) || isNaN(totalNum)) return "";
+        const paymentsMade = weekly ? Math.floor(days / 5) : days;
+        const owed = totalNum - paymentsMade * pmtNum;
+        return (owed > 0 ? owed : 0).toFixed(2);
+    };
+
     const showForm = isAdding || editingDeal !== null;
 
     const field = (label: string, key: keyof DealFormData, type = "text", prefix?: string) => (
@@ -287,7 +312,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         type={type}
                         step={type === "number" ? "0.01" : undefined}
                         placeholder={type === "number" ? "0.00" : undefined}
-                        value={formData[key]}
+                        value={formData[key] as string}
                         onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
                     />
                 </div>
@@ -296,7 +321,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     type={type}
                     step={type === "number" ? "0.01" : undefined}
                     placeholder={type === "number" ? "0.00" : undefined}
-                    value={formData[key]}
+                    value={formData[key] as string}
                     onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
                 />
             )}
@@ -345,6 +370,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     <th>Net Funded</th>
                                     <th>Term (days)</th>
                                     <th>Factor Rate</th>
+                                    <th>Total Payback</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -358,6 +384,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         <td>{formatCurrency(deal.netFundedAmount)}</td>
                                         <td>{deal.loanTerm ?? "-"}</td>
                                         <td>{deal.factorRate ?? "-"}</td>
+                                        <td>{formatCurrency(deal.totalPaybackAmount)}</td>
                                         <td className="action-cell">
                                             <button className="btn btn-sm btn-success" onClick={() => startEdit(deal)} disabled={showForm}>Edit</button>
                                             <button className="btn btn-sm btn-danger" onClick={() => handleDelete(deal)} disabled={showForm}>Delete</button>
@@ -365,7 +392,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     </tr>
                                 ))}
                                 {deals.length === 0 && (
-                                    <tr><td colSpan={8} className="empty-row">No deals found for this corporation</td></tr>
+                                    <tr><td colSpan={9} className="empty-row">No deals found for this corporation</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -438,8 +465,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                                     ? ((parseFloat(formData.brokerFee) / 100) * fundedNum).toFixed(2)
                                                     : formData.brokerCommission;
                                                 const total = calcTotalPayback(funded, formData.factorRate);
-                                                const payment = calcPayment(total, formData.loanTerm, formData.weeklyOrDailyPayment === "true");
-                                                setFormData({ ...formData, fundedAmount: funded, netFundedAmount: net, originationFeePercent: pct, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment });
+                                                const weekly = formData.weeklyOrDailyPayment === "true";
+                                                const payment = calcPayment(total, formData.loanTerm, weekly);
+                                                const owed = formData.hasDefaulted ? calcAmountOwed(funded, formData.defaultDate, payment, total, weekly) : "";
+                                                setFormData({ ...formData, fundedAmount: funded, netFundedAmount: net, originationFeePercent: pct, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
                                             }}
                                             onBlur={(e) => {
                                                 const v = parseFloat(e.target.value);
@@ -523,8 +552,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                                 ? (buyNum + feeNum / 100).toFixed(2)
                                                 : buy !== "" ? buy : "";
                                             const total = calcTotalPayback(formData.fundedAmount, factor);
-                                            const payment = calcPayment(total, formData.loanTerm, formData.weeklyOrDailyPayment === "true");
-                                            setFormData({ ...formData, buyRate: buy, factorRate: factor, totalPaybackAmount: total, paymentAmount: payment });
+                                            const weekly = formData.weeklyOrDailyPayment === "true";
+                                            const payment = calcPayment(total, formData.loanTerm, weekly);
+                                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, total, weekly) : "";
+                                            setFormData({ ...formData, buyRate: buy, factorRate: factor, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
                                         }}
                                     />
                                 </div>
@@ -548,8 +579,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                                     ? ((feeNum / 100) * parseFloat(formData.fundedAmount)).toFixed(2)
                                                     : formData.brokerCommission;
                                                 const total = calcTotalPayback(formData.fundedAmount, factor);
-                                                const payment = calcPayment(total, formData.loanTerm, formData.weeklyOrDailyPayment === "true");
-                                                setFormData({ ...formData, brokerFee: fee, factorRate: factor, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment });
+                                                const weekly = formData.weeklyOrDailyPayment === "true";
+                                                const payment = calcPayment(total, formData.loanTerm, weekly);
+                                                const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, total, weekly) : "";
+                                                setFormData({ ...formData, brokerFee: fee, factorRate: factor, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
                                             }}
                                         />
                                     </div>
@@ -574,7 +607,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         onChange={(e) => {
                                             const weekly = e.target.value === "true";
                                             const payment = calcPayment(formData.totalPaybackAmount, formData.loanTerm, weekly);
-                                            setFormData({ ...formData, weeklyOrDailyPayment: e.target.value, paymentAmount: payment });
+                                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, formData.totalPaybackAmount, weekly) : "";
+                                            setFormData({ ...formData, weeklyOrDailyPayment: e.target.value, paymentAmount: payment, amountOwedAsOfDefault: owed });
                                         }}
                                     >
                                         <option value="false">Daily</option>
@@ -590,8 +624,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         value={formData.loanTerm}
                                         onChange={(e) => {
                                             const term = e.target.value;
-                                            const payment = calcPayment(formData.totalPaybackAmount, term, formData.weeklyOrDailyPayment === "true");
-                                            setFormData({ ...formData, loanTerm: term, paymentAmount: payment });
+                                            const weekly = formData.weeklyOrDailyPayment === "true";
+                                            const payment = calcPayment(formData.totalPaybackAmount, term, weekly);
+                                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, formData.totalPaybackAmount, weekly) : "";
+                                            setFormData({ ...formData, loanTerm: term, paymentAmount: payment, amountOwedAsOfDefault: owed });
                                         }}
                                     />
                                 </div>
@@ -610,22 +646,34 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     </div>
                                 </div>
 
-                                {/* Row 5: Default Date/Days | Renewal Date */}
+                                {/* Row 5: Default Date/Days | Amount Owed as of Default | (empty) | Renewal Date */}
                                 <div className="form-row">
                                     <label>Default Date / Days</label>
-                                    <div style={{ display: "flex", gap: "0.4rem" }}>
+                                    <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                                        <input
+                                            type="checkbox"
+                                            style={{ width: "auto", flexShrink: 0 }}
+                                            checked={formData.hasDefaulted}
+                                            onChange={(e) => {
+                                                const checked = e.target.checked;
+                                                const owed = checked ? calcAmountOwed(formData.fundedDate, formData.defaultDate, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
+                                                setFormData({ ...formData, hasDefaulted: checked, amountOwedAsOfDefault: owed });
+                                            }}
+                                        />
                                         <input
                                             type="date"
                                             style={{ flex: 2 }}
                                             value={formData.defaultDate}
+                                            disabled={!formData.hasDefaulted}
                                             onChange={(e) => {
                                                 const dateVal = e.target.value;
                                                 let days = "";
-                                                if (dateVal) {
-                                                    const diff = Date.now() - new Date(dateVal).getTime();
+                                                if (dateVal && formData.fundedDate) {
+                                                    const diff = parseDateUTC(dateVal) - parseDateUTC(formData.fundedDate);
                                                     days = Math.floor(diff / 86400000).toString();
                                                 }
-                                                setFormData({ ...formData, defaultDate: dateVal, defaultDays: days });
+                                                const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, dateVal, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
+                                                setFormData({ ...formData, defaultDate: dateVal, defaultDays: days, amountOwedAsOfDefault: owed });
                                             }}
                                         />
                                         <input
@@ -633,18 +681,28 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             style={{ flex: 1, minWidth: 0 }}
                                             placeholder="Days"
                                             value={formData.defaultDays}
+                                            disabled={!formData.hasDefaulted}
                                             onChange={(e) => {
                                                 const daysVal = e.target.value;
                                                 let dateStr = "";
-                                                if (daysVal !== "") {
-                                                    const d = new Date(Date.now() - parseInt(daysVal) * 86400000);
-                                                    dateStr = d.toISOString().split("T")[0];
+                                                if (daysVal !== "" && formData.fundedDate) {
+                                                    const ms = parseDateUTC(formData.fundedDate) + parseInt(daysVal) * 86400000;
+                                                    dateStr = new Date(ms).toISOString().split("T")[0];
                                                 }
-                                                setFormData({ ...formData, defaultDays: daysVal, defaultDate: dateStr });
+                                                const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, dateStr, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
+                                                setFormData({ ...formData, defaultDays: daysVal, defaultDate: dateStr, amountOwedAsOfDefault: owed });
                                             }}
                                         />
                                     </div>
                                 </div>
+                                <div className="form-row">
+                                    <label>Amount Owed as of Default</label>
+                                    <div className="input-prefixed">
+                                        <span className="input-prefix-symbol">$</span>
+                                        <input type="number" step="0.01" value={formData.amountOwedAsOfDefault} disabled />
+                                    </div>
+                                </div>
+                                <div />
                                 {field("Renewal Date", "renewalDate", "date")}
                             </div>
                         </div>

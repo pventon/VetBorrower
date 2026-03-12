@@ -16,7 +16,39 @@
 import BrokersModel from '../dbModel/brokerRecordModel.js';
 
 export async function GetAllBrokers(officeAcronym) {
-  return await BrokersModel.find({ officeAcronym });
+  return await BrokersModel.aggregate([
+    { $match: { officeAcronym } },
+    {
+      $lookup: {
+        from: 'deals',
+        localField: '_id',
+        foreignField: 'broker',
+        as: 'dealDocs'
+      }
+    },
+    {
+      $addFields: {
+        numberOfFundedDeals: { $size: '$dealDocs' },
+        totalDollarAmountFunded: { $sum: '$dealDocs.fundedAmount' },
+        totalDollarAmountOfDefaults: {
+          $sum: {
+            $map: {
+              input: '$dealDocs',
+              as: 'd',
+              in: { $cond: [{ $eq: ['$$d.hasDefaulted', true] }, { $ifNull: ['$$d.amountOwedAsOfDefault', 0] }, 0] }
+            }
+          }
+        },
+        totalNumberOfDefaults: {
+          $size: {
+            $filter: { input: '$dealDocs', as: 'd', cond: { $eq: ['$$d.hasDefaulted', true] } }
+          }
+        },
+        totalCommissionAmount: { $sum: '$dealDocs.brokerCommission' }
+      }
+    },
+    { $project: { dealDocs: 0 } }
+  ]);
 }
 
 export async function GetBrokerById(id) {
@@ -34,4 +66,9 @@ export async function UpdateBroker(id, data) {
 
 export async function DeleteBroker(id) {
   return await BrokersModel.findByIdAndDelete(id);
+}
+
+export async function UpdateBrokerStatsIncrement(brokerId, delta) {
+  if (!brokerId) return;
+  return await BrokersModel.findByIdAndUpdate(brokerId, { $inc: delta });
 }

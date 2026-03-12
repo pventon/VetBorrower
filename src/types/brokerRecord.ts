@@ -24,5 +24,6 @@ export interface BrokerRecord {
   numberOfFundedDeals: number;
   totalDollarAmountFunded: number;
   totalDollarAmountOfDefaults: number;
+  totalNumberOfDefaults: number;
   totalCommissionAmount: number;
 }

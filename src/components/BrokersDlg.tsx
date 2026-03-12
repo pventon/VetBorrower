@@ -163,13 +163,14 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                         <thead>
                             <tr>
                                 <th>Broker Name</th>
-                                <th>Submissions</th>
-                                <th>Approvals</th>
-                                <th>Declines</th>
-                                <th>Funded Deals</th>
-                                <th>Total Funded</th>
-                                <th>Defaults</th>
-                                <th>Commission</th>
+                                <th style={{ textAlign: "center" }}>Submissions</th>
+                                <th style={{ textAlign: "center" }}>Approvals</th>
+                                <th style={{ textAlign: "center" }}>Declines</th>
+                                <th style={{ textAlign: "center" }}>Funded Deals</th>
+                                <th style={{ textAlign: "right" }}>Total Funded</th>
+                                <th style={{ textAlign: "right" }}>Defaults</th>
+                                <th style={{ textAlign: "center" }}>Num. Defaults</th>
+                                <th style={{ textAlign: "right" }}>Commission</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -177,13 +178,14 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                             {brokers.map((broker) => (
                                 <tr key={broker._id} className={editingBroker?._id === broker._id ? "selected-row" : ""}>
                                     <td>{broker.brokerName}</td>
-                                    <td>{broker.numberOfSubmissions ?? 0}</td>
-                                    <td>{broker.numberOfApprovals ?? 0}</td>
-                                    <td>{broker.numberOfDeclines ?? 0}</td>
-                                    <td>{broker.numberOfFundedDeals ?? 0}</td>
-                                    <td>{formatCurrency(broker.totalDollarAmountFunded ?? 0)}</td>
-                                    <td>{formatCurrency(broker.totalDollarAmountOfDefaults ?? 0)}</td>
-                                    <td>{formatCurrency(broker.totalCommissionAmount ?? 0)}</td>
+                                    <td style={{ textAlign: "center" }}>{broker.numberOfSubmissions ?? 0}</td>
+                                    <td style={{ textAlign: "center" }}>{broker.numberOfApprovals ?? 0}</td>
+                                    <td style={{ textAlign: "center" }}>{broker.numberOfDeclines ?? 0}</td>
+                                    <td style={{ textAlign: "center" }}>{broker.numberOfFundedDeals ?? 0}</td>
+                                    <td style={{ textAlign: "right" }}>{formatCurrency(broker.totalDollarAmountFunded ?? 0)}</td>
+                                    <td style={{ textAlign: "right" }}>{formatCurrency(broker.totalDollarAmountOfDefaults ?? 0)}</td>
+                                    <td style={{ textAlign: "center" }}>{broker.totalNumberOfDefaults ?? 0}</td>
+                                    <td style={{ textAlign: "right" }}>{formatCurrency(broker.totalCommissionAmount ?? 0)}</td>
                                     <td className="action-cell">
                                         <button className="btn btn-sm btn-success" onClick={() => startEdit(broker)} disabled={showForm}>Edit</button>
                                         <button className="btn btn-sm btn-danger" onClick={() => handleDelete(broker)} disabled={showForm}>Delete</button>
@@ -191,7 +193,7 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                                 </tr>
                             ))}
                             {brokers.length === 0 && (
-                                <tr><td colSpan={9} className="empty-row">No brokers found</td></tr>
+                                <tr><td colSpan={10} className="empty-row">No brokers found</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -238,6 +240,10 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                                         <div className="form-row" style={{ flex: "0 0 auto" }}>
                                             <label>Defaults</label>
                                             <input type="text" readOnly value={formatCurrency(editingBroker.totalDollarAmountOfDefaults ?? 0)} style={{ background: "#f5f5f5" }} />
+                                        </div>
+                                        <div className="form-row" style={{ flex: "0 0 auto" }}>
+                                            <label>Num. Defaults</label>
+                                            <input type="text" readOnly value={editingBroker.totalNumberOfDefaults ?? 0} style={{ background: "#f5f5f5" }} />
                                         </div>
                                         <div className="form-row" style={{ flex: "0 0 auto" }}>
                                             <label>Commission</label>

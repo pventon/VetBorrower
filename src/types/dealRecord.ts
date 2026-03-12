@@ -37,4 +37,6 @@ export interface DealRecord {
   brokerFee: number;
   brokerCommission: number;
   totalPaybackAmount: number;
+  hasDefaulted: boolean;
+  amountOwedAsOfDefault: number;
 }

@@ -16,7 +16,6 @@
 import express from 'express';
 import {
   GetDealsByCorporation,
-  GetDealById,
   AddDeal,
   UpdateDeal,
   DeleteDeal
