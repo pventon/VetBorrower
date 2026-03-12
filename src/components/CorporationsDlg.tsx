@@ -131,20 +131,26 @@ interface CorporationsDlgProps {
     onClose: () => void;
 }
 
-interface OwnerFormData {
-    ownerName: string;
-    ownerPhone: string;
-    ownerEmail: string;
-    ethnicity: string;
-    dob: string;
-    age: string;
-}
-
 interface AddressFormData {
     streetName: string;
     city: string;
     state: string;
     zip: string;
+}
+
+interface OwnerFormData {
+    ownerFirstName: string;
+    ownerLastName: string;
+    ownerPhone: string;
+    ownerEmail: string;
+    ethnicity: string;
+    gender: string;
+    dob: string;
+    age: string;
+    ssn: string;
+    ficoScore: string;
+    driversLicenseNumber: string;
+    homeAddress: AddressFormData;
 }
 
 interface CorpFormData {
@@ -154,23 +160,26 @@ interface CorpFormData {
     timeInBusiness: number;
     businessStartDate: string;
     lengthOfOwnership: number;
-    ficoScore: number;
     stateOfTheBusiness: string;
     industryType: string;
     businessAddress: AddressFormData;
-    homeAddress: AddressFormData;
     owners: OwnerFormData[];
 }
 
-type TabName = "general" | "owner" | "business-address" | "home-address";
+type TabName = "general" | "owner" | "business-address";
 
 const emptyAddress: AddressFormData = { streetName: "", city: "", state: "", zip: "" };
-const emptyOwner: OwnerFormData = { ownerName: "", ownerPhone: "", ownerEmail: "", ethnicity: "", dob: "", age: "" };
+const emptyOwner: OwnerFormData = {
+    ownerFirstName: "", ownerLastName: "", ownerPhone: "", ownerEmail: "",
+    ethnicity: "", gender: "", dob: "", age: "",
+    ssn: "", ficoScore: "", driversLicenseNumber: "",
+    homeAddress: { ...emptyAddress },
+};
 const emptyForm: CorpFormData = {
     businessName: "", dbaName: "", percentOfOwnership: 0,
-    timeInBusiness: 0, businessStartDate: "", lengthOfOwnership: 0, ficoScore: 0,
+    timeInBusiness: 0, businessStartDate: "", lengthOfOwnership: 0,
     stateOfTheBusiness: "", industryType: "",
-    businessAddress: { ...emptyAddress }, homeAddress: { ...emptyAddress },
+    businessAddress: { ...emptyAddress },
     owners: [{ ...emptyOwner }],
 };
 
@@ -188,11 +197,17 @@ function formatPhone(value: string): string {
     return `(${digits.slice(0, 3)})-${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
+function formatSSN(value: string): string {
+    const digits = value.replace(/\D/g, "").slice(0, 9);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+}
+
 const tabs: { key: TabName; label: string }[] = [
     { key: "general", label: "General" },
     { key: "owner", label: "Owner" },
     { key: "business-address", label: "Business Address" },
-    { key: "home-address", label: "Home Address" },
 ];
 
 export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
@@ -202,7 +217,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
     const [error, setError] = useState<string | null>(null);
     const [editingCorp, setEditingCorp] = useState<CorporationRecord | null>(null);
     const [isAdding, setIsAdding] = useState(false);
-    const [formData, setFormData] = useState<CorpFormData>({ ...emptyForm, businessAddress: { ...emptyAddress }, homeAddress: { ...emptyAddress } });
+    const [formData, setFormData] = useState<CorpFormData>({ ...emptyForm, businessAddress: { ...emptyAddress } });
     const [formError, setFormError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<TabName>("general");
 
@@ -228,7 +243,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
 
     const startAdd = () => {
         setEditingCorp(null);
-        setFormData({ ...emptyForm, businessAddress: { ...emptyAddress }, homeAddress: { ...emptyAddress }, owners: [{ ...emptyOwner }] });
+        setFormData({ ...emptyForm, businessAddress: { ...emptyAddress }, owners: [{ ...emptyOwner }] });
         setFormError(null);
         setActiveTab("general");
         setIsAdding(true);
@@ -238,12 +253,18 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
         setIsAdding(false);
         setEditingCorp(corp);
         const owners = (corp.ownerDetails ?? []).map(o => ({
-            ownerName: o.ownerName?.[0] ?? "",
+            ownerFirstName: o.ownerFirstName ?? "",
+            ownerLastName: o.ownerLastName ?? "",
             ownerPhone: o.ownerPhone?.[0] ?? "",
             ownerEmail: o.ownerEmail?.[0] ?? "",
             ethnicity: o.ethnicity ?? "",
+            gender: o.gender ?? "",
             dob: toDateInput(o.dob),
             age: o.age ? String(o.age) : "",
+            ssn: o.ssn ?? "",
+            ficoScore: o.ficoScore ? String(o.ficoScore) : "",
+            driversLicenseNumber: o.driversLicenseNumber ?? "",
+            homeAddress: o.homeAddress ? { ...o.homeAddress } : { ...emptyAddress },
         }));
         setFormData({
             businessName: corp.businessName ?? "",
@@ -252,14 +273,10 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
             timeInBusiness: corp.timeInBusiness ?? 0,
             businessStartDate: toDateInput(corp.businessStartDate),
             lengthOfOwnership: corp.lengthOfOwnership ?? 0,
-            ficoScore: corp.ficoScore ?? 0,
             stateOfTheBusiness: corp.stateOfTheBusiness ?? "",
             industryType: corp.industryType ?? "",
             businessAddress: corp.businessAddress
                 ? { ...corp.businessAddress }
-                : { ...emptyAddress },
-            homeAddress: corp.homeAddress
-                ? { ...corp.homeAddress }
                 : { ...emptyAddress },
             owners: owners.length > 0 ? owners : [{ ...emptyOwner }],
         });
@@ -285,12 +302,18 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
             ...formData,
             owners: undefined,
             ownerDetails: formData.owners.map(o => ({
-                ownerName: o.ownerName ? [o.ownerName] : [],
+                ownerFirstName: o.ownerFirstName,
+                ownerLastName: o.ownerLastName,
                 ownerPhone: o.ownerPhone ? [o.ownerPhone] : [],
                 ownerEmail: o.ownerEmail ? [o.ownerEmail] : [],
                 ethnicity: o.ethnicity,
+                gender: o.gender || null,
                 dob: o.dob || null,
                 age: o.age ? parseInt(o.age) : null,
+                ssn: o.ssn || null,
+                ficoScore: o.ficoScore ? parseFloat(o.ficoScore) : null,
+                driversLicenseNumber: o.driversLicenseNumber || null,
+                homeAddress: o.homeAddress,
             })),
         };
         delete body.owners;
@@ -350,8 +373,15 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
         setFormData({ ...formData, owners: updated.length > 0 ? updated : [{ ...emptyOwner }] });
     };
 
-    const updateOwner = (index: number, field: keyof OwnerFormData, value: string) => {
+    const updateOwner = (index: number, field: keyof Omit<OwnerFormData, "homeAddress">, value: string) => {
         const updated = formData.owners.map((o, i) => i === index ? { ...o, [field]: value } : o);
+        setFormData({ ...formData, owners: updated });
+    };
+
+    const updateOwnerAddress = (index: number, field: keyof AddressFormData, value: string) => {
+        const updated = formData.owners.map((o, i) =>
+            i === index ? { ...o, homeAddress: { ...o.homeAddress, [field]: value } } : o
+        );
         setFormData({ ...formData, owners: updated });
     };
 
@@ -494,60 +524,105 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
 
                                 {activeTab === "owner" && (
                                     <div>
-                                        <button className="btn btn-sm" onClick={addOwner}>Add Owner</button>
-                                        <table className="dialog-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Name</th>
-                                                    <th>Phone</th>
-                                                    <th>Email</th>
-                                                    <th>Date of Birth</th>
-                                                    <th>Age</th>
-                                                    <th>Ethnicity</th>
-                                                    <th>Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {formData.owners.map((owner, index) => (
-                                                    <tr key={index}>
-                                                        <td>
-                                                            <input
-                                                                type="text"
-                                                                value={owner.ownerName}
-                                                                onChange={(e) => updateOwner(index, "ownerName", e.target.value)}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <input
-                                                                type="text"
-                                                                value={owner.ownerPhone}
-                                                                onChange={(e) => updateOwner(index, "ownerPhone", formatPhone(e.target.value))}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <input
-                                                                type="email"
-                                                                value={owner.ownerEmail}
-                                                                onChange={(e) => updateOwner(index, "ownerEmail", e.target.value)}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <input
-                                                                type="date"
-                                                                value={owner.dob}
-                                                                onChange={(e) => {
-                                                                    const dob = e.target.value;
-                                                                    const age = dob ? String(Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 86400000))) : "";
-                                                                    const updated = formData.owners.map((o, i) => i === index ? { ...o, dob, age } : o);
-                                                                    setFormData({ ...formData, owners: updated });
-                                                                }}
-                                                            />
-                                                        </td>
-                                                        <td>
+                                        <button className="btn btn-sm" style={{ marginBottom: "0.75rem" }} onClick={addOwner}>Add Owner</button>
+                                        {formData.owners.map((owner, index) => (
+                                            <div key={index} style={{ border: "1px solid var(--color-border, #ccc)", borderRadius: "6px", padding: "0.75rem", marginBottom: "0.75rem" }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                                                    <strong>Owner {index + 1}</strong>
+                                                    <button
+                                                        className="btn btn-sm btn-danger"
+                                                        onClick={() => removeOwner(index)}
+                                                        disabled={formData.owners.length === 1}
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0 1rem" }}>
+                                                    {/* Row 1: First Name | Last Name | Phone | Email */}
+                                                    <div className="form-row">
+                                                        <label>First Name</label>
+                                                        <input type="text" value={owner.ownerFirstName} onChange={(e) => updateOwner(index, "ownerFirstName", e.target.value)} />
+                                                    </div>
+                                                    <div className="form-row">
+                                                        <label>Last Name</label>
+                                                        <input type="text" value={owner.ownerLastName} onChange={(e) => updateOwner(index, "ownerLastName", e.target.value)} />
+                                                    </div>
+                                                    <div className="form-row">
+                                                        <label>Phone</label>
+                                                        <input type="text" value={owner.ownerPhone} onChange={(e) => updateOwner(index, "ownerPhone", formatPhone(e.target.value))} />
+                                                    </div>
+                                                    <div className="form-row">
+                                                        <label>Email</label>
+                                                        <input type="email" value={owner.ownerEmail} onChange={(e) => updateOwner(index, "ownerEmail", e.target.value)} />
+                                                    </div>
+
+                                                    {/* Row 2: Home Street | City | State | Zip */}
+                                                    <div className="form-row">
+                                                        <label>Home Street</label>
+                                                        <AddressSearch
+                                                            value={owner.homeAddress.streetName}
+                                                            onChange={(street) => updateOwnerAddress(index, "streetName", street)}
+                                                            onSelect={(street, city, state, zip) => {
+                                                                const updated = formData.owners.map((o, i) =>
+                                                                    i === index ? { ...o, homeAddress: { streetName: street, city, state, zip } } : o
+                                                                );
+                                                                setFormData({ ...formData, owners: updated });
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div style={{ display: "flex", gap: "0.4rem" }}>
+                                                        <div className="form-row" style={{ flex: 2 }}>
+                                                            <label>City</label>
+                                                            <input type="text" value={owner.homeAddress.city} onChange={(e) => updateOwnerAddress(index, "city", e.target.value)} />
+                                                        </div>
+                                                        <div className="form-row" style={{ flex: 1 }}>
+                                                            <label>State</label>
+                                                            <select value={owner.homeAddress.state} onChange={(e) => updateOwnerAddress(index, "state", e.target.value)}>
+                                                                <option value="">--</option>
+                                                                {(settings?.usStates ?? []).map((s) => (
+                                                                    <option key={s.acronym} value={s.acronym}>{s.acronym}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div className="form-row">
+                                                        <label>Zip</label>
+                                                        <input type="text" value={owner.homeAddress.zip} onChange={(e) => updateOwnerAddress(index, "zip", e.target.value)} />
+                                                    </div>
+                                                    <div className="form-row">
+                                                        <label>Ethnicity</label>
+                                                        <select value={owner.ethnicity} onChange={(e) => updateOwner(index, "ethnicity", e.target.value)}>
+                                                            <option value="">-- Select --</option>
+                                                            <option value="Hispanic or Latino">Hispanic or Latino</option>
+                                                            <option value="American Indian or Alaska Native">American Indian or Alaska Native</option>
+                                                            <option value="Asian">Asian</option>
+                                                            <option value="Black or African American">Black or African American</option>
+                                                            <option value="Native Hawaiian or Other Pacific Islander">Native Hawaiian or Other Pacific Islander</option>
+                                                            <option value="White">White</option>
+                                                            <option value="Not Provided / Declined to State">Not Provided / Declined to State</option>
+                                                        </select>
+                                                    </div>
+
+                                                    {/* Row 3: DOB | Age+Gender | SSN+FICO | DL # */}
+                                                    <div className="form-row">
+                                                        <label>Date of Birth</label>
+                                                        <input
+                                                            type="date"
+                                                            value={owner.dob}
+                                                            onChange={(e) => {
+                                                                const dob = e.target.value;
+                                                                const age = dob ? String(Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 86400000))) : "";
+                                                                const updated = formData.owners.map((o, i) => i === index ? { ...o, dob, age } : o);
+                                                                setFormData({ ...formData, owners: updated });
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div style={{ display: "flex", gap: "0.4rem" }}>
+                                                        <div className="form-row" style={{ flex: 1 }}>
+                                                            <label>Age</label>
                                                             <input
                                                                 type="number"
                                                                 value={owner.age}
-                                                                style={{ width: "4rem" }}
                                                                 onChange={(e) => {
                                                                     const age = e.target.value;
                                                                     const today = new Date();
@@ -556,35 +631,33 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                                                     setFormData({ ...formData, owners: updated });
                                                                 }}
                                                             />
-                                                        </td>
-                                                        <td>
-                                                            <select
-                                                                value={owner.ethnicity}
-                                                                onChange={(e) => updateOwner(index, "ethnicity", e.target.value)}
-                                                            >
-                                                                <option value="">-- Select --</option>
-                                                                <option value="Hispanic or Latino">Hispanic or Latino</option>
-                                                                <option value="American Indian or Alaska Native">American Indian or Alaska Native</option>
-                                                                <option value="Asian">Asian</option>
-                                                                <option value="Black or African American">Black or African American</option>
-                                                                <option value="Native Hawaiian or Other Pacific Islander">Native Hawaiian or Other Pacific Islander</option>
-                                                                <option value="White">White</option>
-                                                                <option value="Not Provided / Declined to State">Not Provided / Declined to State</option>
+                                                        </div>
+                                                        <div className="form-row" style={{ flex: 1 }}>
+                                                            <label>Gender</label>
+                                                            <select value={owner.gender} onChange={(e) => updateOwner(index, "gender", e.target.value)}>
+                                                                <option value="">--</option>
+                                                                <option value="M">M</option>
+                                                                <option value="F">F</option>
                                                             </select>
-                                                        </td>
-                                                        <td className="action-cell">
-                                                            <button
-                                                                className="btn btn-sm btn-danger"
-                                                                onClick={() => removeOwner(index)}
-                                                                disabled={formData.owners.length === 1}
-                                                            >
-                                                                Remove
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: "flex", gap: "0.4rem" }}>
+                                                        <div className="form-row" style={{ flex: 2 }}>
+                                                            <label>SSN</label>
+                                                            <input type="text" value={owner.ssn} placeholder="xxx-xx-xxxx" onChange={(e) => updateOwner(index, "ssn", formatSSN(e.target.value))} />
+                                                        </div>
+                                                        <div className="form-row" style={{ flex: 1 }}>
+                                                            <label>FICO</label>
+                                                            <input type="number" value={owner.ficoScore} onChange={(e) => updateOwner(index, "ficoScore", e.target.value)} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="form-row">
+                                                        <label>Driver's License #</label>
+                                                        <input type="text" value={owner.driversLicenseNumber} onChange={(e) => updateOwner(index, "driversLicenseNumber", e.target.value)} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
 
@@ -631,48 +704,6 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                     </div>
                                 )}
 
-                                {activeTab === "home-address" && (
-                                    <div>
-                                        <div className="form-row">
-                                            <label>Street Name</label>
-                                            <AddressSearch
-                                                value={formData.homeAddress.streetName}
-                                                onChange={(street) => setFormData({ ...formData, homeAddress: { ...formData.homeAddress, streetName: street } })}
-                                                onSelect={(street, city, state, zip) => setFormData({ ...formData, homeAddress: { streetName: street, city, state, zip } })}
-                                            />
-                                        </div>
-                                        <div style={{ display: "flex", gap: "1rem" }}>
-                                            <div className="form-row" style={{ flex: 2 }}>
-                                                <label>City</label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.homeAddress.city}
-                                                    onChange={(e) => setFormData({ ...formData, homeAddress: { ...formData.homeAddress, city: e.target.value } })}
-                                                />
-                                            </div>
-                                            <div className="form-row" style={{ flex: 1 }}>
-                                                <label>State</label>
-                                                <select
-                                                    value={formData.homeAddress.state}
-                                                    onChange={(e) => setFormData({ ...formData, homeAddress: { ...formData.homeAddress, state: e.target.value } })}
-                                                >
-                                                    <option value="">-- Select State --</option>
-                                                    {(settings?.usStates ?? []).map((s) => (
-                                                        <option key={s.acronym} value={s.acronym}>{s.acronym} - {s.fullname}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="form-row" style={{ flex: 1 }}>
-                                                <label>Zip</label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.homeAddress.zip}
-                                                    onChange={(e) => setFormData({ ...formData, homeAddress: { ...formData.homeAddress, zip: e.target.value } })}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}

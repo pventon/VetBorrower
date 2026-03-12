@@ -14,20 +14,26 @@
  * agreement or proposed agreement with Ventec SW LLC.
  */
 
-export interface Owner {
-  ownerName: string[];
-  ownerPhone: string[];
-  ownerEmail: string[];
-  ethnicity: string;
-  dob: string;
-  age: number;
-}
-
 export interface Address {
   streetName: string;
   city: string;
   state: string;
   zip: string;
+}
+
+export interface Owner {
+  ownerFirstName: string;
+  ownerLastName: string;
+  ownerPhone: string[];
+  ownerEmail: string[];
+  ethnicity: string;
+  gender: string;
+  dob: string;
+  age: number;
+  ssn: string;
+  ficoScore: number;
+  driversLicenseNumber: string;
+  homeAddress: Address;
 }
 
 export interface CorporationRecord {
@@ -37,11 +43,9 @@ export interface CorporationRecord {
   ownerDetails: Owner[];
   percentOfOwnership: number;
   businessAddress: Address;
-  homeAddress: Address;
   timeInBusiness: number;
   businessStartDate: string;
   lengthOfOwnership: number;
-  ficoScore: number;
   stateOfTheBusiness: string;
   industryType: string;
   officeAcronym: string;

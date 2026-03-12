@@ -15,17 +15,6 @@
  */
 import mongoose from 'mongoose';
 
-const Owner = new mongoose.Schema({
-
-  ownerName: [String],
-  ownerPhone: [String],
-  ownerEmail: [String],
-  ethnicity: String,
-  dob: Date,
-  age: Number,
-
-}, { _id: false });
-
 const Address = new mongoose.Schema({
 
   streetName: String,
@@ -35,18 +24,33 @@ const Address = new mongoose.Schema({
 
 }, { _id: false });
 
+const Owner = new mongoose.Schema({
+
+  ownerFirstName: String,
+  ownerLastName: String,
+  ownerPhone: [String],
+  ownerEmail: [String],
+  ethnicity: String,
+  gender: String,                 // 'M' | 'F'
+  dob: Date,
+  age: Number,
+  ssn: String,
+  ficoScore: Number,
+  driversLicenseNumber: String,
+  homeAddress: Address,
+
+}, { _id: false });
+
 const corporationSchema = new mongoose.Schema({
-  
+
   businessName: String,
   dbaName: String,                // DBA = Doing Business As
   ownerDetails: [Owner],
   percentOfOwnership: Number,
   businessAddress: Address,
-  homeAddress: Address,
   timeInBusiness: Number,         // In days
   businessStartDate: Date,
   lengthOfOwnership: Number,
-  ficoScore: Number,
   stateOfTheBusiness: String,     // US state the business operates in
   industryType: String,
   officeAcronym: String,

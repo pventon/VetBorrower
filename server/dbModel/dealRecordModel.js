@@ -36,6 +36,8 @@ const dealSchema = new mongoose.Schema({
   factorRate: Number,
   mcaHistory: String,
   brokerFee: Number,
+  brokerCommission: Number,
+  totalPaybackAmount: Number,
   
 }, {
   collection: "deals"              // Explicitly set the collection name

@@ -35,4 +35,6 @@ export interface DealRecord {
   factorRate: number;
   mcaHistory: string;
   brokerFee: number;
+  brokerCommission: number;
+  totalPaybackAmount: number;
 }

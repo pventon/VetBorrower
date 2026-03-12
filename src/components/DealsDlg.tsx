@@ -47,6 +47,8 @@ interface DealFormData {
     factorRate: string;
     mcaHistory: string;
     brokerFee: string;
+    brokerCommission: string;
+    totalPaybackAmount: string;
 }
 
 const emptyForm: DealFormData = {
@@ -68,6 +70,8 @@ const emptyForm: DealFormData = {
     factorRate: "",
     mcaHistory: "",
     brokerFee: "",
+    brokerCommission: "",
+    totalPaybackAmount: "",
 };
 
 function formatCurrency(value: number | undefined): string {
@@ -164,13 +168,25 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             originationFeePercent: deal.originationFeePercent?.toFixed(2) ?? "",
             loanTerm: deal.loanTerm?.toString() ?? "",
             weeklyOrDailyPayment: deal.weeklyOrDailyPayment ? "true" : "false",
-            paymentAmount: deal.paymentAmount?.toString() ?? "",
+            paymentAmount: (() => {
+                const total = deal.fundedAmount != null && deal.factorRate != null ? deal.fundedAmount * deal.factorRate : deal.totalPaybackAmount ?? 0;
+                const term = deal.loanTerm ?? 0;
+                if (total > 0 && term > 0)
+                    return deal.weeklyOrDailyPayment ? (total / (term / 5)).toFixed(2) : (total / term).toFixed(2);
+                return deal.paymentAmount?.toFixed(2) ?? "";
+            })(),
             buyRate: deal.buyRate?.toString() ?? "",
             brokerFee: deal.brokerFee?.toString() ?? "",
             factorRate: deal.buyRate != null && deal.brokerFee != null
-                ? (deal.buyRate + deal.brokerFee / 100).toFixed(4)
+                ? (deal.buyRate + deal.brokerFee / 100).toFixed(2)
                 : deal.factorRate?.toString() ?? "",
             mcaHistory: deal.mcaHistory ?? "",
+            brokerCommission: deal.brokerFee != null && deal.fundedAmount != null
+                ? ((deal.brokerFee / 100) * deal.fundedAmount).toFixed(2)
+                : deal.brokerCommission?.toFixed(2) ?? "",
+            totalPaybackAmount: deal.fundedAmount != null && deal.factorRate != null
+                ? (deal.fundedAmount * deal.factorRate).toFixed(2)
+                : deal.totalPaybackAmount?.toFixed(2) ?? "",
         });
         setFormError(null);
     };
@@ -205,6 +221,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             factorRate: formData.factorRate ? parseFloat(formData.factorRate) : null,
             mcaHistory: formData.mcaHistory,
             brokerFee: formData.brokerFee ? parseFloat(formData.brokerFee) : null,
+            brokerCommission: formData.brokerCommission ? parseFloat(formData.brokerCommission) : null,
+            totalPaybackAmount: formData.totalPaybackAmount ? parseFloat(formData.totalPaybackAmount) : null,
         };
 
         try {
@@ -243,6 +261,18 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         } catch (err) {
             setError(err instanceof Error ? err.message : "Delete failed");
         }
+    };
+
+    const calcTotalPayback = (funded: string, factor: string): string => {
+        const f = parseFloat(funded), r = parseFloat(factor);
+        return !isNaN(f) && !isNaN(r) ? (f * r).toFixed(2) : "";
+    };
+
+    const calcPayment = (total: string, term: string, weekly: boolean): string => {
+        const t = parseFloat(total), l = parseInt(term);
+        if (!isNaN(t) && !isNaN(l) && l > 0)
+            return weekly ? (t / (l / 5)).toFixed(2) : (t / l).toFixed(2);
+        return "";
     };
 
     const showForm = isAdding || editingDeal !== null;
@@ -404,7 +434,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                                 const pct = funded !== "" && formData.originationFee !== "" && fundedNum !== 0
                                                     ? ((feeNum / fundedNum) * 100).toFixed(2)
                                                     : formData.originationFeePercent;
-                                                setFormData({ ...formData, fundedAmount: funded, netFundedAmount: net, originationFeePercent: pct });
+                                                const commission = funded !== "" && formData.brokerFee !== ""
+                                                    ? ((parseFloat(formData.brokerFee) / 100) * fundedNum).toFixed(2)
+                                                    : formData.brokerCommission;
+                                                const total = calcTotalPayback(funded, formData.factorRate);
+                                                const payment = calcPayment(total, formData.loanTerm, formData.weeklyOrDailyPayment === "true");
+                                                setFormData({ ...formData, fundedAmount: funded, netFundedAmount: net, originationFeePercent: pct, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment });
                                             }}
                                             onBlur={(e) => {
                                                 const v = parseFloat(e.target.value);
@@ -472,7 +507,110 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     </div>
                                 </div>
 
-                                {/* Row 3: Default Date/Days | Buy Rate | Broker Fee | Factor Rate */}
+                                {/* Row 3: Buy Rate | Broker Fee | Broker Commission | Factor Rate */}
+                                <div className="form-row">
+                                    <label>Buy Rate</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={formData.buyRate}
+                                        onChange={(e) => {
+                                            const buy = e.target.value;
+                                            const buyNum = parseFloat(buy);
+                                            const feeNum = parseFloat(formData.brokerFee);
+                                            const factor = buy !== "" && formData.brokerFee !== ""
+                                                ? (buyNum + feeNum / 100).toFixed(2)
+                                                : buy !== "" ? buy : "";
+                                            const total = calcTotalPayback(formData.fundedAmount, factor);
+                                            const payment = calcPayment(total, formData.loanTerm, formData.weeklyOrDailyPayment === "true");
+                                            setFormData({ ...formData, buyRate: buy, factorRate: factor, totalPaybackAmount: total, paymentAmount: payment });
+                                        }}
+                                    />
+                                </div>
+                                <div className="form-row">
+                                    <label>Broker Fee</label>
+                                    <div className="input-prefixed">
+                                        <span className="input-prefix-symbol">%</span>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={formData.brokerFee}
+                                            onChange={(e) => {
+                                                const fee = e.target.value;
+                                                const feeNum = parseFloat(fee);
+                                                const buyNum = parseFloat(formData.buyRate);
+                                                const factor = fee !== "" && formData.buyRate !== ""
+                                                    ? (buyNum + feeNum / 100).toFixed(2)
+                                                    : formData.buyRate !== "" ? formData.buyRate : "";
+                                                const commission = fee !== "" && formData.fundedAmount !== ""
+                                                    ? ((feeNum / 100) * parseFloat(formData.fundedAmount)).toFixed(2)
+                                                    : formData.brokerCommission;
+                                                const total = calcTotalPayback(formData.fundedAmount, factor);
+                                                const payment = calcPayment(total, formData.loanTerm, formData.weeklyOrDailyPayment === "true");
+                                                setFormData({ ...formData, brokerFee: fee, factorRate: factor, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment });
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <label>Broker Commission</label>
+                                    <div className="input-prefixed">
+                                        <span className="input-prefix-symbol">$</span>
+                                        <input type="number" step="0.01" value={formData.brokerCommission} disabled />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <label>Factor Rate</label>
+                                    <input type="number" step="0.01" value={formData.factorRate} disabled />
+                                </div>
+
+                                {/* Row 4: Payment Frequency | Loan Term | Total Payback | Payment Amount */}
+                                <div className="form-row">
+                                    <label>Payment Frequency</label>
+                                    <select
+                                        value={formData.weeklyOrDailyPayment}
+                                        onChange={(e) => {
+                                            const weekly = e.target.value === "true";
+                                            const payment = calcPayment(formData.totalPaybackAmount, formData.loanTerm, weekly);
+                                            setFormData({ ...formData, weeklyOrDailyPayment: e.target.value, paymentAmount: payment });
+                                        }}
+                                    >
+                                        <option value="false">Daily</option>
+                                        <option value="true">Weekly</option>
+                                    </select>
+                                </div>
+                                <div className="form-row">
+                                    <label>Loan Term (days)</label>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        placeholder="0"
+                                        value={formData.loanTerm}
+                                        onChange={(e) => {
+                                            const term = e.target.value;
+                                            const payment = calcPayment(formData.totalPaybackAmount, term, formData.weeklyOrDailyPayment === "true");
+                                            setFormData({ ...formData, loanTerm: term, paymentAmount: payment });
+                                        }}
+                                    />
+                                </div>
+                                <div className="form-row">
+                                    <label>Total Payback</label>
+                                    <div className="input-prefixed">
+                                        <span className="input-prefix-symbol">$</span>
+                                        <input type="number" step="0.01" value={formData.totalPaybackAmount} disabled />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <label>Payment Amount</label>
+                                    <div className="input-prefixed">
+                                        <span className="input-prefix-symbol">$</span>
+                                        <input type="number" step="0.01" value={formData.paymentAmount} disabled />
+                                    </div>
+                                </div>
+
+                                {/* Row 5: Default Date/Days | Renewal Date */}
                                 <div className="form-row">
                                     <label>Default Date / Days</label>
                                     <div style={{ display: "flex", gap: "0.4rem" }}>
@@ -507,64 +645,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         />
                                     </div>
                                 </div>
-                                <div className="form-row">
-                                    <label>Buy Rate</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={formData.buyRate}
-                                        onChange={(e) => {
-                                            const buy = e.target.value;
-                                            const buyNum = parseFloat(buy);
-                                            const feeNum = parseFloat(formData.brokerFee);
-                                            const factor = buy !== "" && formData.brokerFee !== ""
-                                                ? (buyNum + feeNum / 100).toFixed(4)
-                                                : buy !== "" ? buy : "";
-                                            setFormData({ ...formData, buyRate: buy, factorRate: factor });
-                                        }}
-                                    />
-                                </div>
-                                <div className="form-row">
-                                    <label>Broker Fee</label>
-                                    <div className="input-prefixed">
-                                        <span className="input-prefix-symbol">%</span>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="0.00"
-                                            value={formData.brokerFee}
-                                            onChange={(e) => {
-                                                const fee = e.target.value;
-                                                const feeNum = parseFloat(fee);
-                                                const buyNum = parseFloat(formData.buyRate);
-                                                const factor = fee !== "" && formData.buyRate !== ""
-                                                    ? (buyNum + feeNum / 100).toFixed(4)
-                                                    : formData.buyRate !== "" ? formData.buyRate : "";
-                                                setFormData({ ...formData, brokerFee: fee, factorRate: factor });
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="form-row">
-                                    <label>Factor Rate</label>
-                                    <input type="number" step="0.0001" value={formData.factorRate} disabled />
-                                </div>
-
-                                {/* Row 4: Renewal Date | Loan Term | Payment Amount | Payment Frequency */}
                                 {field("Renewal Date", "renewalDate", "date")}
-                                {field("Loan Term (days)", "loanTerm", "number")}
-                                {field("Payment Amount", "paymentAmount", "number", "$")}
-                                <div className="form-row">
-                                    <label>Payment Frequency</label>
-                                    <select
-                                        value={formData.weeklyOrDailyPayment}
-                                        onChange={(e) => setFormData({ ...formData, weeklyOrDailyPayment: e.target.value })}
-                                    >
-                                        <option value="false">Daily</option>
-                                        <option value="true">Weekly</option>
-                                    </select>
-                                </div>
                             </div>
                         </div>
                     )}
