@@ -41,6 +41,10 @@ const dealSchema = new mongoose.Schema({
   hasDefaulted: Boolean,
   amountOwedAsOfDefault: Number,
 
+  // Deal renewal linking
+  renewalDealId: { type: mongoose.Schema.Types.ObjectId, ref: 'Deals', default: null },  // Points to the renewal created from this deal
+  parentDealId: { type: mongoose.Schema.Types.ObjectId, ref: 'Deals', default: null },   // Points back to the deal this renewal was created from
+
 }, {
   collection: "deals"              // Explicitly set the collection name
 });

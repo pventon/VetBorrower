@@ -276,6 +276,47 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         }
     };
 
+    const handleRenew = async (deal: DealRecord) => {
+        if (!selectedCorpId) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/deal/${deal._id}/renew`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ corporationId: selectedCorpId }),
+            });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to renew deal"); }
+            const renewal = await res.json();
+            await fetchDeals(selectedCorpId);
+            // Open the new renewal for editing
+            const updatedDeals = await (await fetch(`${API_BASE}/api/deal?corporationId=${selectedCorpId}`, { headers })).json();
+            setDeals(updatedDeals);
+            const renewalDeal = updatedDeals.find((d: DealRecord) => d._id === renewal._id);
+            if (renewalDeal) startEdit(renewalDeal);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Renew failed");
+        }
+    };
+
+    // Build hierarchical deal list: root deals followed by their renewal chains, indented
+    const buildOrderedDeals = (): { deal: DealRecord; indent: boolean }[] => {
+        const result: { deal: DealRecord; indent: boolean }[] = [];
+        // Root deals have no parentDealId
+        const roots = deals.filter(d => !d.parentDealId);
+        for (const root of roots) {
+            result.push({ deal: root, indent: false });
+            // Walk the renewal chain from this root
+            let currentId = root.renewalDealId;
+            while (currentId) {
+                const renewal = deals.find(d => d._id === currentId);
+                if (!renewal) break;
+                result.push({ deal: renewal, indent: true });
+                currentId = renewal.renewalDealId;
+            }
+        }
+        return result;
+    };
+    const orderedDeals = buildOrderedDeals();
+
     const calcTotalPayback = (funded: string, factor: string): string => {
         const f = parseFloat(funded), r = parseFloat(factor);
         return !isNaN(f) && !isNaN(r) ? (f * r).toFixed(2) : "";
@@ -681,9 +722,11 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {deals.map((deal) => (
+                                {orderedDeals.map(({ deal, indent }) => (
                                     <tr key={deal._id} className={editingDeal?._id === deal._id ? "selected-row" : ""}>
-                                        <td>{deal.broker?.brokerName ?? "-"}</td>
+                                        <td style={indent ? { paddingLeft: "2rem" } : undefined}>
+                                            {indent ? "↳ " : ""}{deal.broker?.brokerName ?? "-"}
+                                        </td>
                                         <td>{deal.typeOfDeal ?? "-"}</td>
                                         <td>{formatDate(deal.fundedDate)}</td>
                                         <td>{formatCurrency(deal.fundedAmount)}</td>
@@ -693,7 +736,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         <td>{formatCurrency(deal.totalPaybackAmount)}</td>
                                         <td className="action-cell">
                                             <button className="btn btn-sm btn-success" onClick={() => startEdit(deal)} disabled={isAdding || showForm}>Edit</button>
-                                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(deal)} disabled={isAdding || showForm}>Delete</button>
+                                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(deal)} disabled={isAdding || showForm || !!deal.renewalDealId}>Delete</button>
+                                            <button className="btn btn-sm" onClick={() => handleRenew(deal)} disabled={isAdding || showForm || !!deal.renewalDealId}>Renew</button>
                                         </td>
                                     </tr>
                                 ))}
@@ -708,11 +752,11 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             </div>
         </div>
 
-        {showForm && (
+        {showForm && editingDeal && (
             <div className="dialog-overlay" style={{ zIndex: 2001 }}>
                 <div className="dialog dialog-extra-wide">
                     <div className="dialog-header">
-                        <h2>Edit Deal</h2>
+                        <h2>Edit Deal{editingDeal.parentDealId ? " (Renewal)" : ""}</h2>
                         <button className="dialog-close" onClick={cancelForm}>&times;</button>
                     </div>
                     {formError && <div className="dialog-error">{formError}</div>}
@@ -723,6 +767,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     </div>
                     <div className="dialog-footer">
                         <button className="btn btn-primary" onClick={handleSave}>Save</button>
+                        <button className="btn" onClick={() => { cancelForm(); handleRenew(editingDeal); }} disabled={!!editingDeal.renewalDealId}>Renew Deal</button>
                         <button className="btn" onClick={cancelForm}>Cancel</button>
                     </div>
                 </div>

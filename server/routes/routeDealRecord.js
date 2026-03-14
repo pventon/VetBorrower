@@ -16,6 +16,7 @@
 import express from 'express';
 import {
   GetDealsByCorporation,
+  GetDealById,
   AddDeal,
   UpdateDeal,
   DeleteDeal
@@ -74,12 +75,58 @@ router.put('/api/deal/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Renew a deal — creates a new renewal deal linked to the parent
+router.post('/api/deal/:id/renew', authenticateToken, async (req, res) => {
+  try {
+    const parentId = req.params.id;
+    const { corporationId } = req.body;
+    if (!corporationId) return res.status(400).json({ error: 'corporationId is required' });
+
+    // Check parent deal exists and hasn't already been renewed
+    const parent = await GetDealById(parentId);
+    if (!parent) return res.status(404).json({ error: 'Parent deal not found' });
+    if (parent.renewalDealId) return res.status(400).json({ error: 'This deal has already been renewed' });
+
+    // Create renewal deal with same broker/office, typeOfDeal = "renewal", linked to parent
+    const renewalData = {
+      officeAcronym: req.user.officeAcronym,
+      broker: parent.broker,
+      typeOfDeal: 'renewal',
+      parentDealId: parentId,
+      renewalDealId: null,
+    };
+    const renewal = await AddDeal(renewalData);
+
+    // Link parent to the new renewal
+    await UpdateDeal(parentId, { renewalDealId: renewal._id });
+
+    // Add renewal to the corporation's deals array
+    await AddDealToCorporation(corporationId, renewal._id);
+
+    res.status(201).json(renewal);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Delete a deal and unlink it from the corporation
 router.delete('/api/deal/:id', authenticateToken, async (req, res) => {
   try {
     const { corporationId } = req.query;
+    const deal = await GetDealById(req.params.id);
+    if (!deal) return res.status(404).json({ error: 'Deal not found' });
+
+    // Prevent deleting a deal that has renewals — must delete renewals first
+    if (deal.renewalDealId) {
+      return res.status(400).json({ error: 'Cannot delete a deal that has renewals. Delete the renewal first.' });
+    }
+
+    // If this deal is a renewal, clear the parent's renewalDealId
+    if (deal.parentDealId) {
+      await UpdateDeal(deal.parentDealId, { renewalDealId: null });
+    }
+
     const record = await DeleteDeal(req.params.id);
-    if (!record) return res.status(404).json({ error: 'Deal not found' });
     if (corporationId) await RemoveDealFromCorporation(corporationId, req.params.id);
     res.json({ message: 'Deal deleted', record });
   } catch (error) {

@@ -39,4 +39,6 @@ export interface DealRecord {
   totalPaybackAmount: number;
   hasDefaulted: boolean;
   amountOwedAsOfDefault: number;
+  renewalDealId: string | null;    // ID of the renewal deal created from this deal
+  parentDealId: string | null;     // ID of the parent deal this renewal was created from
 }
