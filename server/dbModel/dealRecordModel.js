@@ -17,6 +17,7 @@ import mongoose from 'mongoose';
 
 const dealSchema = new mongoose.Schema({
     
+  entityId: String,               // Auto-assigned: D1000, D1001, ...
   officeAcronym: String,
   broker: { type: mongoose.Schema.Types.ObjectId, ref: 'Brokers' },
   typeOfDeal: String,             // new/renewal
@@ -24,7 +25,6 @@ const dealSchema = new mongoose.Schema({
   fundedDate: Date,
   defaultDate: Date,
   defaultDays: Number,
-  renewalDate: Date,
   fundedAmount: Number,
   netFundedAmount: Number,
   originationFee: Number,
@@ -41,12 +41,22 @@ const dealSchema = new mongoose.Schema({
   hasDefaulted: Boolean,
   amountOwedAsOfDefault: Number,
 
+  // Additional fee/expense fields
+  miscellaneousFees: Number,
+  miscellaneousExpenses: Number,
+  discount: Number,
+  amountPaidIn: Number,
+
   // Renewal-specific fields
   rolledBalance: Number,
   netNewCashOut: Number,
 
   // Common to deals and renewals
   roi: Number,
+  currentRoi: Number,
+
+  // Deal state: dormant | active | completed | default | renewal
+  dealState: { type: String, default: 'dormant' },
 
   // Deal renewal linking
   renewalDealId: { type: mongoose.Schema.Types.ObjectId, ref: 'Deals', default: null },  // Points to the renewal created from this deal

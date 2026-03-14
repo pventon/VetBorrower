@@ -23,6 +23,8 @@ import {
 } from '../dbAccessFunctions/dealRecord.js';
 import { AddDealToCorporation, RemoveDealFromCorporation } from '../dbAccessFunctions/corporationRecord.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
+import { getNextEntityId } from '../dbModel/counterModel.js';
+import { deriveDealState, applyDealState } from '../dbAccessFunctions/dealStateEngine.js';
 
 const router = express.Router();
 
@@ -32,6 +34,12 @@ router.get('/api/deal', authenticateToken, async (req, res) => {
     const { corporationId } = req.query;
     if (!corporationId) return res.status(400).json({ error: 'corporationId query parameter is required' });
     const records = await GetDealsByCorporation(corporationId);
+    // Recalculate deal states and persist any changes
+    for (const deal of records) {
+      if (applyDealState(deal)) {
+        await UpdateDeal(deal._id, { dealState: deal.dealState });
+      }
+    }
     res.json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -43,6 +51,9 @@ router.get('/api/deal/:id', authenticateToken, async (req, res) => {
   try {
     const record = await GetDealById(req.params.id);
     if (!record) return res.status(404).json({ error: 'Deal not found' });
+    if (applyDealState(record)) {
+      await UpdateDeal(record._id, { dealState: record.dealState });
+    }
     res.json(record);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -55,6 +66,8 @@ router.post('/api/deal', authenticateToken, async (req, res) => {
     const { corporationId, ...dealData } = req.body;
     if (!corporationId) return res.status(400).json({ error: 'corporationId is required' });
     dealData.officeAcronym = req.user.officeAcronym;
+    dealData.entityId = await getNextEntityId('deal', 'D');
+    dealData.dealState = deriveDealState(dealData);
     const record = await AddDeal(dealData);
     await AddDealToCorporation(corporationId, record._id);
     res.status(201).json(record);
@@ -67,8 +80,12 @@ router.post('/api/deal', authenticateToken, async (req, res) => {
 router.put('/api/deal/:id', authenticateToken, async (req, res) => {
   try {
     const dealData = { ...req.body, officeAcronym: req.user.officeAcronym };
+    // Merge with existing deal data to derive state accurately
+    const existing = await GetDealById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Deal not found' });
+    const merged = { ...existing.toObject(), ...dealData };
+    dealData.dealState = deriveDealState(merged);
     const record = await UpdateDeal(req.params.id, dealData);
-    if (!record) return res.status(404).json({ error: 'Deal not found' });
     res.json(record);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -89,22 +106,26 @@ router.post('/api/deal/:id/renew', authenticateToken, async (req, res) => {
 
     // Create renewal deal with same broker/office, typeOfDeal = "renewal", linked to parent
     const renewalData = {
+      entityId: await getNextEntityId('deal', 'D'),
       officeAcronym: req.user.officeAcronym,
       broker: parent.broker,
       typeOfDeal: 'renewal',
       parentDealId: parentId,
       renewalDealId: null,
+      fundedDate: new Date(),
     };
+    renewalData.dealState = deriveDealState(renewalData);
     const renewal = await AddDeal(renewalData);
 
-    // Link parent to the new renewal and set its renewal date to today
-    await UpdateDeal(parentId, { renewalDealId: renewal._id, renewalDate: new Date() });
+    // Link parent to the new renewal and update its state to 'renewal'
+    await UpdateDeal(parentId, { renewalDealId: renewal._id, dealState: 'renewed' });
 
     // Add renewal to the corporation's deals array
     await AddDealToCorporation(corporationId, renewal._id);
 
     res.status(201).json(renewal);
   } catch (error) {
+    console.error('Renew deal error:', error);
     res.status(500).json({ error: error.message });
   }
 });

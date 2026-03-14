@@ -43,6 +43,7 @@ const Owner = new mongoose.Schema({
 
 const corporationSchema = new mongoose.Schema({
 
+  entityId: String,               // Auto-assigned: C1000, C1001, ...
   businessName: String,
   dbaName: String,                // DBA = Doing Business As
   ownerDetails: [Owner],

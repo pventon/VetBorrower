@@ -677,6 +677,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                         <table className="dialog-table">
                             <thead>
                                 <tr>
+                                    <th>ID</th>
                                     <th>Business Name</th>
                                     <th>DBA</th>
                                     <th>Industry</th>
@@ -687,6 +688,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                             <tbody>
                                 {corporations.map((corp) => (
                                     <tr key={corp._id} className={editingCorp?._id === corp._id ? "selected-row" : ""} onDoubleClick={() => startEdit(corp)}>
+                                        <td>{corp.entityId ?? "-"}</td>
                                         <td>{corp.businessName}</td>
                                         <td>{corp.dbaName}</td>
                                         <td>{corp.industryType}</td>
@@ -698,7 +700,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                     </tr>
                                 ))}
                                 {corporations.length === 0 && (
-                                    <tr><td colSpan={5} className="empty-row">No corporations found</td></tr>
+                                    <tr><td colSpan={6} className="empty-row">No corporations found</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -707,7 +709,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                 </div>
             </div>
 
-            {showForm && (
+            {showForm && editingCorp && (
                 <div className="dialog-overlay" style={{ zIndex: 2001 }}>
                     <div className="dialog dialog-extra-wide">
                         <div className="dialog-header">
@@ -716,6 +718,10 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                         </div>
                         {formError && <div className="dialog-error">{formError}</div>}
                         <div className="dialog-body">
+                            <div className="form-row" style={{ marginBottom: "0.5rem" }}>
+                                <label>Client ID</label>
+                                <input type="text" value={editingCorp.entityId ?? ""} disabled />
+                            </div>
                             {formFields}
                         </div>
                         <div className="dialog-footer">

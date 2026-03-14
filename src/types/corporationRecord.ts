@@ -38,6 +38,7 @@ export interface Owner {
 
 export interface CorporationRecord {
   _id: string;
+  entityId: string;
   businessName: string;
   dbaName: string;
   ownerDetails: Owner[];

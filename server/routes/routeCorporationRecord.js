@@ -22,6 +22,7 @@ import {
   DeleteCorporation
 } from '../dbAccessFunctions/corporationRecord.js';
 import { authenticateToken, authorizeRoles } from '../middleware/authMiddleware.js';
+import { getNextEntityId } from '../dbModel/counterModel.js';
 
 const router = express.Router();
 
@@ -51,6 +52,7 @@ router.get('/api/corporation/:id', authenticateToken, authorizeRoles('root', 'ad
 router.post('/api/corporation', authenticateToken, authorizeRoles('root', 'admin', 'manager', 'user'), async (req, res) => {
   try {
     req.body.officeAcronym = req.user.officeAcronym;
+    req.body.entityId = await getNextEntityId('corporation', 'C');
     const record = await AddCorporation(req.body);
     res.status(201).json(record);
   } catch (error) {

@@ -16,6 +16,7 @@
 
 export interface DealRecord {
   _id: string;
+  entityId: string;
   officeAcronym: string;
   broker: { _id: string; brokerName: string } | null;  // populated from Brokers collection
   typeOfDeal: string;         // "new" | "renewal"
@@ -23,7 +24,6 @@ export interface DealRecord {
   fundedDate: string;
   defaultDate: string;
   defaultDays: number;
-  renewalDate: string;
   fundedAmount: number;
   netFundedAmount: number;
   originationFee: number;
@@ -39,9 +39,15 @@ export interface DealRecord {
   totalPaybackAmount: number;
   hasDefaulted: boolean;
   amountOwedAsOfDefault: number;
+  miscellaneousFees: number;
+  miscellaneousExpenses: number;
+  discount: number;
+  amountPaidIn: number;
   rolledBalance: number;
   netNewCashOut: number;
   roi: number;
+  currentRoi: number;
+  dealState: string;              // "dormant" | "active" | "completed" | "default" | "renewal"
   renewalDealId: string | null;    // ID of the renewal deal created from this deal
   parentDealId: string | null;     // ID of the parent deal this renewal was created from
 }

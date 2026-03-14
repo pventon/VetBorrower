@@ -163,6 +163,7 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                         <table className="dialog-table">
                             <thead>
                                 <tr>
+                                    <th>ID</th>
                                     <th>Broker Name</th>
                                     <th style={{ textAlign: "center" }}>Submissions</th>
                                     <th style={{ textAlign: "center" }}>Approvals</th>
@@ -178,6 +179,7 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                             <tbody>
                                 {brokers.map((broker) => (
                                     <tr key={broker._id} className={editingBroker?._id === broker._id ? "selected-row" : ""} onDoubleClick={() => startEdit(broker)}>
+                                        <td>{broker.entityId ?? "-"}</td>
                                         <td>{broker.brokerName}</td>
                                         <td style={{ textAlign: "center" }}>{broker.numberOfSubmissions ?? 0}</td>
                                         <td style={{ textAlign: "center" }}>{broker.numberOfApprovals ?? 0}</td>
@@ -194,7 +196,7 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                                     </tr>
                                 ))}
                                 {brokers.length === 0 && (
-                                    <tr><td colSpan={10} className="empty-row">No brokers found</td></tr>
+                                    <tr><td colSpan={11} className="empty-row">No brokers found</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -203,7 +205,7 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                 </div>
             </div>
 
-            {showForm && (
+            {showForm && editingBroker && (
                 <div className="dialog-overlay" style={{ zIndex: 2001 }}>
                     <div className="dialog dialog-extra-wide">
                         <div className="dialog-header">
@@ -212,6 +214,10 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                         </div>
                         {formError && <div className="dialog-error">{formError}</div>}
                         <div className="dialog-body">
+                            <div className="form-row">
+                                <label>Broker ID</label>
+                                <input type="text" value={editingBroker.entityId ?? ""} disabled />
+                            </div>
                             <div className="form-row">
                                 <label>Broker Name</label>
                                 <input

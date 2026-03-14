@@ -22,6 +22,7 @@ import {
   DeleteBroker
 } from '../dbAccessFunctions/brokerRecord.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
+import { getNextEntityId } from '../dbModel/counterModel.js';
 
 const router = express.Router();
 
@@ -49,7 +50,8 @@ router.get('/api/broker/:id', authenticateToken, async (req, res) => {
 // Add a broker — silently inject the user's officeAcronym
 router.post('/api/broker', authenticateToken, async (req, res) => {
   try {
-    const record = await AddBroker({ ...req.body, officeAcronym: req.user.officeAcronym });
+    const entityId = await getNextEntityId('broker', 'B');
+    const record = await AddBroker({ ...req.body, officeAcronym: req.user.officeAcronym, entityId });
     res.status(201).json(record);
   } catch (error) {
     res.status(500).json({ error: error.message });

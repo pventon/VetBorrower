@@ -35,7 +35,6 @@ interface DealFormData {
     fundedDate: string;
     defaultDate: string;
     defaultDays: string;
-    renewalDate: string;
     fundedAmount: string;
     netFundedAmount: string;
     originationFee: string;
@@ -51,9 +50,14 @@ interface DealFormData {
     totalPaybackAmount: string;
     hasDefaulted: boolean;
     amountOwedAsOfDefault: string;
+    miscellaneousFees: string;
+    miscellaneousExpenses: string;
+    discount: string;
+    amountPaidIn: string;
     rolledBalance: string;
     netNewCashOut: string;
     roi: string;
+    currentRoi: string;
 }
 
 const emptyForm: DealFormData = {
@@ -63,7 +67,6 @@ const emptyForm: DealFormData = {
     fundedDate: "",
     defaultDate: "",
     defaultDays: "",
-    renewalDate: "",
     fundedAmount: "",
     netFundedAmount: "",
     originationFee: "",
@@ -79,9 +82,14 @@ const emptyForm: DealFormData = {
     totalPaybackAmount: "",
     hasDefaulted: false,
     amountOwedAsOfDefault: "",
+    miscellaneousFees: "",
+    miscellaneousExpenses: "",
+    discount: "",
+    amountPaidIn: "",
     rolledBalance: "",
     netNewCashOut: "",
     roi: "",
+    currentRoi: "",
 };
 
 function formatCurrency(value: number | undefined): string {
@@ -126,6 +134,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const [error, setError] = useState<string | null>(null);
     const [editingDeal, setEditingDeal] = useState<DealRecord | null>(null);
     const [isAdding, setIsAdding] = useState(false);
+    const [renewingParentId, setRenewingParentId] = useState<string | null>(null);
     const [formData, setFormData] = useState<DealFormData>(emptyForm);
     const [formError, setFormError] = useState<string | null>(null);
 
@@ -172,7 +181,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
     const startAdd = () => {
         setEditingDeal(null);
-        setFormData(emptyForm);
+        setFormData({ ...emptyForm, fundedDate: new Date().toISOString().split("T")[0] });
         setFormError(null);
         setIsAdding(true);
     };
@@ -187,7 +196,6 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             fundedDate: toDateInput(deal.fundedDate),
             defaultDate: toDateInput(deal.defaultDate),
             defaultDays: deal.defaultDays?.toString() ?? "",
-            renewalDate: toDateInput(deal.renewalDate),
             fundedAmount: deal.fundedAmount != null ? formatDollar(deal.fundedAmount.toFixed(2)) : "",
             netFundedAmount: deal.netFundedAmount?.toString() ?? "",
             originationFee: deal.originationFee != null ? formatDollar(deal.originationFee.toFixed(2)) : "",
@@ -215,9 +223,14 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 : deal.totalPaybackAmount?.toFixed(2) ?? "",
             hasDefaulted: deal.hasDefaulted ?? false,
             amountOwedAsOfDefault: deal.amountOwedAsOfDefault?.toFixed(2) ?? "",
+            miscellaneousFees: deal.miscellaneousFees != null ? formatDollar(deal.miscellaneousFees.toFixed(2)) : "",
+            miscellaneousExpenses: deal.miscellaneousExpenses != null ? formatDollar(deal.miscellaneousExpenses.toFixed(2)) : "",
+            discount: deal.discount != null ? formatDollar(deal.discount.toFixed(2)) : "",
+            amountPaidIn: deal.amountPaidIn != null ? formatDollar(deal.amountPaidIn.toFixed(2)) : "",
             rolledBalance: deal.rolledBalance != null ? formatDollar(deal.rolledBalance.toFixed(2)) : "",
             netNewCashOut: deal.netNewCashOut != null ? formatDollar(deal.netNewCashOut.toFixed(2)) : "",
             roi: deal.roi?.toFixed(2) ?? "",
+            currentRoi: deal.currentRoi?.toFixed(2) ?? "",
         });
         setFormError(null);
     };
@@ -225,6 +238,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const cancelForm = () => {
         setEditingDeal(null);
         setIsAdding(false);
+        setRenewingParentId(null);
         setFormError(null);
     };
 
@@ -240,7 +254,6 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             fundedDate: formData.fundedDate || null,
             defaultDate: formData.defaultDate || null,
             defaultDays: formData.defaultDays ? parseInt(formData.defaultDays) : null,
-            renewalDate: formData.renewalDate || null,
             fundedAmount: formData.fundedAmount ? parseFloat(stripCommas(formData.fundedAmount)) : null,
             netFundedAmount: formData.netFundedAmount ? parseFloat(stripCommas(formData.netFundedAmount)) : null,
             originationFee: formData.originationFee ? parseFloat(stripCommas(formData.originationFee)) : null,
@@ -256,19 +269,37 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             totalPaybackAmount: formData.totalPaybackAmount ? parseFloat(stripCommas(formData.totalPaybackAmount)) : null,
             hasDefaulted: formData.hasDefaulted,
             amountOwedAsOfDefault: formData.amountOwedAsOfDefault ? parseFloat(stripCommas(formData.amountOwedAsOfDefault)) : null,
+            miscellaneousFees: formData.miscellaneousFees ? parseFloat(stripCommas(formData.miscellaneousFees)) : null,
+            miscellaneousExpenses: formData.miscellaneousExpenses ? parseFloat(stripCommas(formData.miscellaneousExpenses)) : null,
+            discount: formData.discount ? parseFloat(stripCommas(formData.discount)) : null,
+            amountPaidIn: formData.amountPaidIn ? parseFloat(stripCommas(formData.amountPaidIn)) : null,
             rolledBalance: formData.rolledBalance ? parseFloat(stripCommas(formData.rolledBalance)) : null,
             netNewCashOut: formData.netNewCashOut ? parseFloat(stripCommas(formData.netNewCashOut)) : null,
             roi: formData.roi ? parseFloat(formData.roi) : null,
+            currentRoi: formData.currentRoi ? parseFloat(formData.currentRoi) : null,
         };
 
         try {
             if (isAdding) {
+                // If this is a renewal, include the parent link
+                if (renewingParentId) {
+                    (payload as Record<string, unknown>).parentDealId = renewingParentId;
+                }
                 const res = await fetch(`${API_BASE}/api/deal`, {
                     method: "POST",
                     headers,
                     body: JSON.stringify(payload),
                 });
-                if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to add deal"); }
+                const resData = await res.json();
+                if (!res.ok) throw new Error(resData.error || "Failed to add deal");
+                // If renewal, link the parent to this new deal
+                if (renewingParentId) {
+                    await fetch(`${API_BASE}/api/deal/${renewingParentId}`, {
+                        method: "PUT",
+                        headers,
+                        body: JSON.stringify({ renewalDealId: resData._id }),
+                    });
+                }
             } else if (editingDeal) {
                 const res = await fetch(`${API_BASE}/api/deal/${editingDeal._id}`, {
                     method: "PUT",
@@ -299,31 +330,30 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         }
     };
 
-    const showRenewal = (deal: DealRecord) => {
+    const showNextRenewal = (deal: DealRecord) => {
         if (!deal.renewalDealId) return;
         const renewal = deals.find(d => d._id === deal.renewalDealId);
         if (renewal) startEdit(renewal);
     };
 
-    const handleRenew = async (deal: DealRecord) => {
-        if (!selectedCorpId) return;
-        try {
-            const res = await fetch(`${API_BASE}/api/deal/${deal._id}/renew`, {
-                method: "POST",
-                headers,
-                body: JSON.stringify({ corporationId: selectedCorpId }),
-            });
-            if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to renew deal"); }
-            const renewal = await res.json();
-            await fetchDeals(selectedCorpId);
-            // Open the new renewal for editing
-            const updatedDeals = await (await fetch(`${API_BASE}/api/deal?corporationId=${selectedCorpId}`, { headers })).json();
-            setDeals(updatedDeals);
-            const renewalDeal = updatedDeals.find((d: DealRecord) => d._id === renewal._id);
-            if (renewalDeal) startEdit(renewalDeal);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Renew failed");
-        }
+    const showPreviousRenewal = (deal: DealRecord) => {
+        if (!deal.parentDealId) return;
+        const parent = deals.find(d => d._id === deal.parentDealId);
+        if (parent) startEdit(parent);
+    };
+
+    const handleRenew = (deal: DealRecord) => {
+        setEditingDeal(null);
+        setRenewingParentId(deal._id);
+        const today = new Date().toISOString().split("T")[0];
+        setFormData({
+            ...emptyForm,
+            broker: deal.broker?._id ?? "",
+            typeOfDeal: "renewal",
+            fundedDate: today,
+        });
+        setFormError(null);
+        setIsAdding(true);
     };
 
     // Build hierarchical deal list: root deals followed by their renewal chains, indented
@@ -372,36 +402,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
     const showForm = editingDeal !== null;
 
-    const field = (label: string, key: keyof DealFormData, type = "text", prefix?: string) => (
-        <div className="form-row">
-            <label>{label}</label>
-            {prefix ? (
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">{prefix}</span>
-                    <input
-                        type={type}
-                        step={type === "number" ? "0.01" : undefined}
-                        placeholder={type === "number" ? "0.00" : undefined}
-                        value={formData[key] as string}
-                        onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
-                    />
-                </div>
-            ) : (
-                <input
-                    type={type}
-                    step={type === "number" ? "0.01" : undefined}
-                    placeholder={type === "number" ? "0.00" : undefined}
-                    value={formData[key] as string}
-                    onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
-                />
-            )}
-        </div>
-    );
-
     const formGrid = (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0 1rem" }}>
-            {/* Row 1: Broker | Type of Deal | Position | MCA History */}
-            <div className="form-row">
+            {/* Row 1: Broker | Position | MCA History | (empty) */}
+            <div className="form-row" title="Select the broker associated with this deal">
                 <label>Broker</label>
                 <select
                     value={formData.broker}
@@ -413,18 +417,11 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     ))}
                 </select>
             </div>
-            <div className="form-row">
-                <label>Type of Deal</label>
-                <select
-                    value={formData.typeOfDeal}
-                    onChange={(e) => setFormData({ ...formData, typeOfDeal: e.target.value })}
-                >
-                    <option value="new">New</option>
-                    <option value="renewal">Renewal</option>
-                </select>
+            <div className="form-row" title="Number of lenders assigned to this deal">
+                <label>Position</label>
+                <input type="text" value={formData.position} onChange={(e) => setFormData({ ...formData, position: e.target.value })} />
             </div>
-            {field("Position", "position")}
-            <div className="form-row">
+            <div className="form-row" title="Has this client had a previous Merchant Cash Advance?">
                 <label>MCA History</label>
                 <select
                     value={formData.mcaHistory}
@@ -435,10 +432,14 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     <option value="No">No</option>
                 </select>
             </div>
+            <div />
 
             {/* Row 2: Funded Date | Funded Amount | Origination Fee | Net Funded Amount */}
-            {field("Funded Date", "fundedDate", "date")}
-            <div className="form-row">
+            <div className="form-row" title="Date the deal was funded">
+                <label>Funded Date</label>
+                <input type="date" value={formData.fundedDate} onChange={(e) => setFormData({ ...formData, fundedDate: e.target.value })} />
+            </div>
+            <div className="form-row" title="Total dollar amount funded for this deal">
                 <label>Funded Amount</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
@@ -474,7 +475,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     />
                 </div>
             </div>
-            <div className="form-row">
+            <div className="form-row" title="Fee charged for originating the deal. Enter as % or $; the other is calculated automatically. Net Funded = Funded Amount - Origination Fee">
                 <label>Origination Fee</label>
                 <div style={{ display: "flex", gap: "0.4rem" }}>
                     <div className="input-prefixed" style={{ flex: 1 }}>
@@ -526,7 +527,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     </div>
                 </div>
             </div>
-            <div className="form-row">
+            <div className="form-row" title="Calculated: Funded Amount minus Origination Fee">
                 <label>Net Funded Amount</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
@@ -535,7 +536,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             </div>
 
             {/* Row 3: Buy Rate | Broker Fee | Broker Commission | Factor Rate */}
-            <div className="form-row">
+            <div className="form-row" title="The base rate charged to the borrower before broker fees">
                 <label>Buy Rate</label>
                 <input
                     type="number"
@@ -557,7 +558,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     }}
                 />
             </div>
-            <div className="form-row">
+            <div className="form-row" title="Broker's fee as a percentage. Commission = (Broker Fee / 100) x Funded Amount">
                 <label>Broker Fee</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">%</span>
@@ -585,20 +586,20 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     />
                 </div>
             </div>
-            <div className="form-row">
+            <div className="form-row" title="Calculated: (Broker Fee % / 100) x Funded Amount">
                 <label>Broker Commission</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
                     <input type="text" value={formatDollar(formData.brokerCommission)} disabled />
                 </div>
             </div>
-            <div className="form-row">
+            <div className="form-row" title="Calculated: Buy Rate + (Broker Fee / 100)">
                 <label>Factor Rate</label>
                 <input type="number" step="0.01" value={formData.factorRate} disabled />
             </div>
 
             {/* Row 4: Payment Frequency | Loan Term | Total Payback | Payment Amount */}
-            <div className="form-row">
+            <div className="form-row" title="How often payments are made: Daily or Weekly">
                 <label>Payment Frequency</label>
                 <select
                     value={formData.weeklyOrDailyPayment}
@@ -613,7 +614,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     <option value="true">Weekly</option>
                 </select>
             </div>
-            <div className="form-row">
+            <div className="form-row" title="Duration of the loan in calendar days">
                 <label>Loan Term (days)</label>
                 <input
                     type="number"
@@ -629,14 +630,14 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     }}
                 />
             </div>
-            <div className="form-row">
+            <div className="form-row" title="Calculated: Funded Amount x Factor Rate">
                 <label>Total Payback</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
                     <input type="text" value={formatDollar(formData.totalPaybackAmount)} disabled />
                 </div>
             </div>
-            <div className="form-row">
+            <div className="form-row" title="Calculated: Weekly = Total Payback / (Term / 5), Daily = Total Payback / Term">
                 <label>Payment Amount</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
@@ -644,8 +645,117 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 </div>
             </div>
 
-            {/* Row 5: Default Date/Days | Amount Owed as of Default | (empty) | Renewal Date */}
-            <div className="form-row">
+            {/* Row 5: Misc Fees | Misc Expenses | Discount | ROI */}
+            <div className="form-row" title="Any additional miscellaneous fees applied to this deal">
+                <label>Miscellaneous Fees</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formData.miscellaneousFees}
+                        onFocus={() => setFormData(f => ({ ...f, miscellaneousFees: stripCommas(f.miscellaneousFees) }))}
+                        onChange={(e) => setFormData({ ...formData, miscellaneousFees: stripCommas(e.target.value) })}
+                        onBlur={(e) => {
+                            const v = parseFloat(stripCommas(e.target.value));
+                            if (!isNaN(v)) setFormData((f) => ({ ...f, miscellaneousFees: formatDollar(v.toFixed(2)) }));
+                        }}
+                    />
+                </div>
+            </div>
+            <div className="form-row" title="Any additional miscellaneous expenses incurred on this deal">
+                <label>Miscellaneous Expenses</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formData.miscellaneousExpenses}
+                        onFocus={() => setFormData(f => ({ ...f, miscellaneousExpenses: stripCommas(f.miscellaneousExpenses) }))}
+                        onChange={(e) => setFormData({ ...formData, miscellaneousExpenses: stripCommas(e.target.value) })}
+                        onBlur={(e) => {
+                            const v = parseFloat(stripCommas(e.target.value));
+                            if (!isNaN(v)) setFormData((f) => ({ ...f, miscellaneousExpenses: formatDollar(v.toFixed(2)) }));
+                        }}
+                    />
+                </div>
+            </div>
+            <div className="form-row" title="Discount amount applied to this deal">
+                <label>Discount</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formData.discount}
+                        onFocus={() => setFormData(f => ({ ...f, discount: stripCommas(f.discount) }))}
+                        onChange={(e) => setFormData({ ...formData, discount: stripCommas(e.target.value) })}
+                        onBlur={(e) => {
+                            const v = parseFloat(stripCommas(e.target.value));
+                            if (!isNaN(v)) setFormData((f) => ({ ...f, discount: formatDollar(v.toFixed(2)) }));
+                        }}
+                    />
+                </div>
+            </div>
+            <div />
+
+            {/* Row 6: Outstanding Amount Owed | Amount Paid In | Expected ROI | Current ROI */}
+            <div className="form-row" title="Calculated: Total Payback minus payments made from Funded Date to today. Stops calculating if deal is renewed or defaulted">
+                <label>Outstanding Amount Owed</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input type="text" value={(() => {
+                        // Don't calculate if deal has been renewed or defaulted
+                        if (editingDeal?.renewalDealId || formData.hasDefaulted) return "";
+                        if (!formData.fundedDate || !formData.totalPaybackAmount || !formData.paymentAmount) return "";
+                        const today = new Date().toISOString().split("T")[0];
+                        const days = Math.floor((parseDateUTC(today) - parseDateUTC(formData.fundedDate)) / 86400000);
+                        if (days <= 0) return "";
+                        const weekly = formData.weeklyOrDailyPayment === "true";
+                        const paymentsMade = weekly ? Math.floor(days / 5) : days;
+                        const owed = parseFloat(stripCommas(formData.totalPaybackAmount)) - paymentsMade * parseFloat(stripCommas(formData.paymentAmount));
+                        return formatDollar((owed > 0 ? owed : 0).toFixed(2));
+                    })()} disabled />
+                </div>
+            </div>
+            <div className="form-row" title="Total amount paid in by the borrower to date">
+                <label>Amount Paid In</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formData.amountPaidIn}
+                        onFocus={() => setFormData(f => ({ ...f, amountPaidIn: stripCommas(f.amountPaidIn) }))}
+                        onChange={(e) => setFormData({ ...formData, amountPaidIn: stripCommas(e.target.value) })}
+                        onBlur={(e) => {
+                            const v = parseFloat(stripCommas(e.target.value));
+                            if (!isNaN(v)) setFormData((f) => ({ ...f, amountPaidIn: formatDollar(v.toFixed(2)) }));
+                        }}
+                    />
+                </div>
+            </div>
+            <div className="form-row" title="Expected Return on Investment percentage for this deal">
+                <label>Expected ROI</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">%</span>
+                    <input type="number" step="0.01" placeholder="0.00" value={formData.roi} onChange={(e) => setFormData({ ...formData, roi: e.target.value })} />
+                </div>
+            </div>
+            <div className="form-row" title="Current Return on Investment based on actual performance">
+                <label>Current ROI</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">%</span>
+                    <input type="number" step="0.01" placeholder="0.00" value={formData.currentRoi} onChange={(e) => setFormData({ ...formData, currentRoi: e.target.value })} />
+                </div>
+            </div>
+
+            {/* Row 7: Default Date/Days | Amount Owed as of Default | (empty) | (empty) */}
+            <div className="form-row" title="Check to mark as defaulted. Date and days since funded are linked; changing one updates the other">
                 <label>Default Date / Days</label>
                 <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
                     <input
@@ -700,38 +810,20 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     />
                 </div>
             </div>
-            <div className="form-row">
+            <div className="form-row" title="Calculated: Total Payback minus payments made from Funded Date to Default Date">
                 <label>Amount Owed as of Default</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
                     <input type="text" value={formatDollar(formData.amountOwedAsOfDefault)} disabled />
                 </div>
             </div>
-            <div className="form-row">
-                <label>Outstanding Amount Owed</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input type="text" value={(() => {
-                        // Don't calculate if deal has been renewed or defaulted
-                        if (editingDeal?.renewalDealId || formData.hasDefaulted) return "";
-                        if (!formData.fundedDate || !formData.totalPaybackAmount || !formData.paymentAmount) return "";
-                        const today = new Date().toISOString().split("T")[0];
-                        const days = Math.floor((parseDateUTC(today) - parseDateUTC(formData.fundedDate)) / 86400000);
-                        if (days <= 0) return "";
-                        const weekly = formData.weeklyOrDailyPayment === "true";
-                        const paymentsMade = weekly ? Math.floor(days / 5) : days;
-                        const owed = parseFloat(stripCommas(formData.totalPaybackAmount)) - paymentsMade * parseFloat(stripCommas(formData.paymentAmount));
-                        return formatDollar((owed > 0 ? owed : 0).toFixed(2));
-                    })()} disabled />
-                </div>
-            </div>
-            {field("ROI", "roi", "number", "%")}
+            <div />
+            <div />
 
-            {/* Row 6: Renewal Date + Renewal-specific fields */}
-            {field("Renewal Date", "renewalDate", "date")}
+            {/* Row 7: Renewal-specific fields (only shown for renewals) */}
             {formData.typeOfDeal === "renewal" && (
                 <>
-                    <div className="form-row">
+                    <div className="form-row" title="Balance rolled over from the previous deal into this renewal">
                         <label>Rolled Balance</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
@@ -749,7 +841,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             />
                         </div>
                     </div>
-                    <div className="form-row">
+                    <div className="form-row" title="New cash disbursed to the client as part of this renewal, excluding the rolled balance">
                         <label>Net New Cash Out</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
@@ -779,7 +871,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         <div className="dialog-overlay">
             <div className="dialog dialog-extra-wide">
                 <div className="dialog-header">
-                    <h2>Deals</h2>
+                    <h2><img src="/hand-money2.png" alt="" style={{ height: "40px", width: "auto", verticalAlign: "middle", marginRight: "8px" }} />Deals</h2>
                     <button className="dialog-close" onClick={onClose}>&times;</button>
                 </div>
 
@@ -810,40 +902,43 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <table className="dialog-table" style={{ marginTop: "1rem" }}>
                             <thead>
                                 <tr>
-                                    <th>Broker</th>
-                                    <th>Type</th>
-                                    <th>Funded Date</th>
-                                    <th>Funded Amount</th>
-                                    <th>Net Funded</th>
-                                    <th>Term (days)</th>
-                                    <th>Factor Rate</th>
-                                    <th>Total Payback</th>
-                                    <th>Actions</th>
+                                    <th>ID</th>
+                                    <th style={{ textAlign: "center" }}>Broker</th>
+                                    <th style={{ textAlign: "center" }}>Type</th>
+                                    <th style={{ textAlign: "center" }}>State</th>
+                                    <th style={{ textAlign: "center" }}>Funded Date</th>
+                                    <th style={{ textAlign: "right" }}>Funded Amount</th>
+                                    <th style={{ textAlign: "right" }}>Net Funded</th>
+                                    <th style={{ textAlign: "center" }}>Term (days)</th>
+                                    <th style={{ textAlign: "center" }}>Factor Rate</th>
+                                    <th style={{ textAlign: "right" }}>Total Payback</th>
+                                    <th style={{ textAlign: "center" }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {orderedDeals.map(({ deal, indent }) => (
-                                    <tr key={deal._id} className={editingDeal?._id === deal._id ? "selected-row" : ""} onDoubleClick={() => startEdit(deal)}>
-                                        <td style={indent ? { paddingLeft: "2rem" } : undefined}>
-                                            {indent ? "↳ " : ""}{deal.broker?.brokerName ?? "-"}
+                                    <tr key={deal._id} className={editingDeal?._id === deal._id ? "selected-row" : ""} style={indent ? { backgroundColor: "#f0e6f6" } : undefined} onDoubleClick={() => startEdit(deal)}>
+                                        <td style={indent ? { paddingLeft: "1.5rem" } : undefined}>
+                                            {indent ? "↳ " : ""}{deal.entityId ?? "-"}
                                         </td>
-                                        <td>{deal.typeOfDeal ?? "-"}</td>
-                                        <td>{formatDate(deal.fundedDate)}</td>
-                                        <td>{formatCurrency(deal.fundedAmount)}</td>
-                                        <td>{formatCurrency(deal.netFundedAmount)}</td>
-                                        <td>{deal.loanTerm ?? "-"}</td>
-                                        <td>{deal.factorRate ?? "-"}</td>
-                                        <td>{formatCurrency(deal.totalPaybackAmount)}</td>
+                                        <td style={{ textAlign: "center" }}>{deal.broker?.brokerName ?? "-"}</td>
+                                        <td style={{ textAlign: "center", textTransform: "capitalize" }}>{deal.typeOfDeal ?? "-"}</td>
+                                        <td style={{ textAlign: "center", textTransform: "capitalize" }}>{deal.dealState ?? "-"}</td>
+                                        <td style={{ textAlign: "center" }}>{formatDate(deal.fundedDate)}</td>
+                                        <td style={{ textAlign: "right" }}>{formatCurrency(deal.fundedAmount)}</td>
+                                        <td style={{ textAlign: "right" }}>{formatCurrency(deal.netFundedAmount)}</td>
+                                        <td style={{ textAlign: "center" }}>{deal.loanTerm ?? "-"}</td>
+                                        <td style={{ textAlign: "center" }}>{deal.factorRate ?? "-"}</td>
+                                        <td style={{ textAlign: "right" }}>{formatCurrency(deal.totalPaybackAmount)}</td>
                                         <td className="action-cell">
                                             <button className="btn btn-sm btn-success" onClick={() => startEdit(deal)} disabled={isAdding || showForm}>Edit</button>
                                             <button className="btn btn-sm btn-danger" onClick={() => handleDelete(deal)} disabled={isAdding || showForm || !!deal.renewalDealId}>Delete</button>
                                             <button className="btn btn-sm" onClick={() => handleRenew(deal)} disabled={isAdding || showForm || !!deal.renewalDealId}>Renew</button>
-                                            <button className="btn btn-sm" onClick={() => showRenewal(deal)} disabled={isAdding || showForm || !deal.renewalDealId}>Show Renewal</button>
                                         </td>
                                     </tr>
                                 ))}
                                 {deals.length === 0 && (
-                                    <tr><td colSpan={9} className="empty-row">No deals found for this corporation</td></tr>
+                                    <tr><td colSpan={11} className="empty-row">No deals found for this corporation</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -857,7 +952,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             <div className="dialog-overlay" style={{ zIndex: 2001 }}>
                 <div className="dialog dialog-extra-wide">
                     <div className="dialog-header">
-                        <h2>Edit Deal{editingDeal.parentDealId ? " (Renewal)" : ""}</h2>
+                        <h2><img src="/money-bag-gold.png" alt="" style={{ height: "40px", width: "auto", verticalAlign: "middle", marginRight: "8px" }} />{editingDeal.parentDealId ? "Edit Deal Renewal" : "Edit New Deal"} — {editingDeal.entityId ?? ""} <span style={{ fontSize: "0.7em", fontWeight: "normal", textTransform: "capitalize", opacity: 0.8 }}>({editingDeal.dealState ?? "unknown"})</span></h2>
                         <button className="dialog-close" onClick={cancelForm}>&times;</button>
                     </div>
                     {formError && <div className="dialog-error">{formError}</div>}
@@ -868,8 +963,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     </div>
                     <div className="dialog-footer">
                         <button className="btn btn-primary" onClick={handleSave}>Save</button>
-                        <button className="btn" onClick={() => { cancelForm(); handleRenew(editingDeal); }} disabled={!!editingDeal.renewalDealId}>Renew Deal</button>
-                        <button className="btn" onClick={() => showRenewal(editingDeal)} disabled={!editingDeal.renewalDealId}>Show Renewal</button>
+                        <button className="btn" onClick={() => handleRenew(editingDeal)} disabled={!!editingDeal.renewalDealId}>Renew Deal</button>
+                        <button className="btn" onClick={() => showPreviousRenewal(editingDeal)} disabled={!editingDeal.parentDealId}>Show Previous Renewal</button>
+                        <button className="btn" onClick={() => showNextRenewal(editingDeal)} disabled={!editingDeal.renewalDealId}>Show Next Renewal</button>
                         <button className="btn" onClick={cancelForm}>Cancel</button>
                     </div>
                 </div>
@@ -880,7 +976,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             <div className="dialog-overlay" style={{ zIndex: 2001 }}>
                 <div className="dialog dialog-extra-wide">
                     <div className="dialog-header">
-                        <h2>Add Deal</h2>
+                        <h2><img src="/money-present.png" alt="" style={{ height: "40px", width: "auto", verticalAlign: "middle", marginRight: "8px" }} />{renewingParentId ? "Add Renewal Deal" : "Add New Deal"}</h2>
                         <button className="dialog-close" onClick={cancelForm}>&times;</button>
                     </div>
                     {formError && <div className="dialog-error">{formError}</div>}

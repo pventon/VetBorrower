@@ -17,6 +17,7 @@ import mongoose from 'mongoose';
 
 const brokerSchema = new mongoose.Schema({
 
+  entityId: String,               // Auto-assigned: B1000, B1001, ...
   brokerName: String,
   officeAcronym: String,
   numberOfSubmissions: Number,
