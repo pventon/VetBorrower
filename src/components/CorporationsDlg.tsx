@@ -686,7 +686,7 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                             </thead>
                             <tbody>
                                 {corporations.map((corp) => (
-                                    <tr key={corp._id} className={editingCorp?._id === corp._id ? "selected-row" : ""}>
+                                    <tr key={corp._id} className={editingCorp?._id === corp._id ? "selected-row" : ""} onDoubleClick={() => startEdit(corp)}>
                                         <td>{corp.businessName}</td>
                                         <td>{corp.dbaName}</td>
                                         <td>{corp.industryType}</td>

@@ -177,7 +177,7 @@ export default function BrokersDlg({ onClose }: BrokersDlgProps) {
                             </thead>
                             <tbody>
                                 {brokers.map((broker) => (
-                                    <tr key={broker._id} className={editingBroker?._id === broker._id ? "selected-row" : ""}>
+                                    <tr key={broker._id} className={editingBroker?._id === broker._id ? "selected-row" : ""} onDoubleClick={() => startEdit(broker)}>
                                         <td>{broker.brokerName}</td>
                                         <td style={{ textAlign: "center" }}>{broker.numberOfSubmissions ?? 0}</td>
                                         <td style={{ textAlign: "center" }}>{broker.numberOfApprovals ?? 0}</td>

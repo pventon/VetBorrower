@@ -97,8 +97,8 @@ router.post('/api/deal/:id/renew', authenticateToken, async (req, res) => {
     };
     const renewal = await AddDeal(renewalData);
 
-    // Link parent to the new renewal
-    await UpdateDeal(parentId, { renewalDealId: renewal._id });
+    // Link parent to the new renewal and set its renewal date to today
+    await UpdateDeal(parentId, { renewalDealId: renewal._id, renewalDate: new Date() });
 
     // Add renewal to the corporation's deals array
     await AddDealToCorporation(corporationId, renewal._id);

@@ -364,7 +364,7 @@ export default function OfficeDlg({ onClose }: OfficeDlgProps) {
                             </thead>
                             <tbody>
                                 {offices.map((office) => (
-                                    <tr key={office._id} className={editingOffice?._id === office._id ? "selected-row" : ""}>
+                                    <tr key={office._id} className={editingOffice?._id === office._id ? "selected-row" : ""} onDoubleClick={() => startEdit(office)}>
                                         <td>{office.officeAcronym}</td>
                                         <td>{office.officeName}</td>
                                         <td>{office.email}</td>

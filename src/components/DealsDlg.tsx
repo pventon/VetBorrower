@@ -89,6 +89,17 @@ function formatCurrency(value: number | undefined): string {
     return "$" + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatDollar(value: string): string {
+    if (!value) return "";
+    const num = parseFloat(value.replace(/,/g, ""));
+    if (isNaN(num)) return value;
+    return num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function stripCommas(value: string): string {
+    return value.replace(/,/g, "");
+}
+
 function formatDate(value: string | undefined): string {
     if (!value) return "-";
     return new Date(value).toLocaleDateString("en-US");
@@ -177,9 +188,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             defaultDate: toDateInput(deal.defaultDate),
             defaultDays: deal.defaultDays?.toString() ?? "",
             renewalDate: toDateInput(deal.renewalDate),
-            fundedAmount: deal.fundedAmount?.toFixed(2) ?? "",
+            fundedAmount: deal.fundedAmount != null ? formatDollar(deal.fundedAmount.toFixed(2)) : "",
             netFundedAmount: deal.netFundedAmount?.toString() ?? "",
-            originationFee: deal.originationFee?.toFixed(2) ?? "",
+            originationFee: deal.originationFee != null ? formatDollar(deal.originationFee.toFixed(2)) : "",
             originationFeePercent: deal.originationFeePercent?.toFixed(2) ?? "",
             loanTerm: deal.loanTerm?.toString() ?? "",
             weeklyOrDailyPayment: deal.weeklyOrDailyPayment ? "true" : "false",
@@ -204,8 +215,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 : deal.totalPaybackAmount?.toFixed(2) ?? "",
             hasDefaulted: deal.hasDefaulted ?? false,
             amountOwedAsOfDefault: deal.amountOwedAsOfDefault?.toFixed(2) ?? "",
-            rolledBalance: deal.rolledBalance?.toFixed(2) ?? "",
-            netNewCashOut: deal.netNewCashOut?.toFixed(2) ?? "",
+            rolledBalance: deal.rolledBalance != null ? formatDollar(deal.rolledBalance.toFixed(2)) : "",
+            netNewCashOut: deal.netNewCashOut != null ? formatDollar(deal.netNewCashOut.toFixed(2)) : "",
             roi: deal.roi?.toFixed(2) ?? "",
         });
         setFormError(null);
@@ -230,23 +241,23 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             defaultDate: formData.defaultDate || null,
             defaultDays: formData.defaultDays ? parseInt(formData.defaultDays) : null,
             renewalDate: formData.renewalDate || null,
-            fundedAmount: formData.fundedAmount ? parseFloat(formData.fundedAmount) : null,
-            netFundedAmount: formData.netFundedAmount ? parseFloat(formData.netFundedAmount) : null,
-            originationFee: formData.originationFee ? parseFloat(formData.originationFee) : null,
+            fundedAmount: formData.fundedAmount ? parseFloat(stripCommas(formData.fundedAmount)) : null,
+            netFundedAmount: formData.netFundedAmount ? parseFloat(stripCommas(formData.netFundedAmount)) : null,
+            originationFee: formData.originationFee ? parseFloat(stripCommas(formData.originationFee)) : null,
             originationFeePercent: formData.originationFeePercent ? parseFloat(formData.originationFeePercent) : null,
             loanTerm: formData.loanTerm ? parseInt(formData.loanTerm) : null,
             weeklyOrDailyPayment: formData.weeklyOrDailyPayment === "true",
-            paymentAmount: formData.paymentAmount ? parseFloat(formData.paymentAmount) : null,
+            paymentAmount: formData.paymentAmount ? parseFloat(stripCommas(formData.paymentAmount)) : null,
             buyRate: formData.buyRate ? parseFloat(formData.buyRate) : null,
             factorRate: formData.factorRate ? parseFloat(formData.factorRate) : null,
             mcaHistory: formData.mcaHistory,
             brokerFee: formData.brokerFee ? parseFloat(formData.brokerFee) : null,
-            brokerCommission: formData.brokerCommission ? parseFloat(formData.brokerCommission) : null,
-            totalPaybackAmount: formData.totalPaybackAmount ? parseFloat(formData.totalPaybackAmount) : null,
+            brokerCommission: formData.brokerCommission ? parseFloat(stripCommas(formData.brokerCommission)) : null,
+            totalPaybackAmount: formData.totalPaybackAmount ? parseFloat(stripCommas(formData.totalPaybackAmount)) : null,
             hasDefaulted: formData.hasDefaulted,
-            amountOwedAsOfDefault: formData.amountOwedAsOfDefault ? parseFloat(formData.amountOwedAsOfDefault) : null,
-            rolledBalance: formData.rolledBalance ? parseFloat(formData.rolledBalance) : null,
-            netNewCashOut: formData.netNewCashOut ? parseFloat(formData.netNewCashOut) : null,
+            amountOwedAsOfDefault: formData.amountOwedAsOfDefault ? parseFloat(stripCommas(formData.amountOwedAsOfDefault)) : null,
+            rolledBalance: formData.rolledBalance ? parseFloat(stripCommas(formData.rolledBalance)) : null,
+            netNewCashOut: formData.netNewCashOut ? parseFloat(stripCommas(formData.netNewCashOut)) : null,
             roi: formData.roi ? parseFloat(formData.roi) : null,
         };
 
@@ -286,6 +297,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         } catch (err) {
             setError(err instanceof Error ? err.message : "Delete failed");
         }
+    };
+
+    const showRenewal = (deal: DealRecord) => {
+        if (!deal.renewalDealId) return;
+        const renewal = deals.find(d => d._id === deal.renewalDealId);
+        if (renewal) startEdit(renewal);
     };
 
     const handleRenew = async (deal: DealRecord) => {
@@ -330,12 +347,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const orderedDeals = buildOrderedDeals();
 
     const calcTotalPayback = (funded: string, factor: string): string => {
-        const f = parseFloat(funded), r = parseFloat(factor);
+        const f = parseFloat(stripCommas(funded)), r = parseFloat(stripCommas(factor));
         return !isNaN(f) && !isNaN(r) ? (f * r).toFixed(2) : "";
     };
 
     const calcPayment = (total: string, term: string, weekly: boolean): string => {
-        const t = parseFloat(total), l = parseInt(term);
+        const t = parseFloat(stripCommas(total)), l = parseInt(term);
         if (!isNaN(t) && !isNaN(l) && l > 0)
             return weekly ? (t / (l / 5)).toFixed(2) : (t / l).toFixed(2);
         return "";
@@ -345,8 +362,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         if (!fundedDate || !defaultDate || !paymentAmount || !totalPayback) return "";
         const days = Math.floor((parseDateUTC(defaultDate) - parseDateUTC(fundedDate)) / 86400000);
         if (days <= 0) return "";
-        const pmtNum = parseFloat(paymentAmount);
-        const totalNum = parseFloat(totalPayback);
+        const pmtNum = parseFloat(stripCommas(paymentAmount));
+        const totalNum = parseFloat(stripCommas(totalPayback));
         if (isNaN(pmtNum) || isNaN(totalNum)) return "";
         const paymentsMade = weekly ? Math.floor(days / 5) : days;
         const owed = totalNum - paymentsMade * pmtNum;
@@ -426,14 +443,15 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
                     <input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="0.00"
                         value={formData.fundedAmount}
+                        onFocus={() => setFormData(f => ({ ...f, fundedAmount: stripCommas(f.fundedAmount) }))}
                         onChange={(e) => {
-                            const funded = e.target.value;
+                            const funded = stripCommas(e.target.value);
                             const fundedNum = parseFloat(funded);
-                            const feeNum = parseFloat(formData.originationFee);
+                            const feeNum = parseFloat(stripCommas(formData.originationFee));
                             const net = funded !== "" && formData.originationFee !== ""
                                 ? (fundedNum - feeNum).toFixed(2)
                                 : funded !== "" ? parseFloat(funded).toFixed(2) : "";
@@ -450,8 +468,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             setFormData({ ...formData, fundedAmount: funded, netFundedAmount: net, originationFeePercent: pct, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
                         }}
                         onBlur={(e) => {
-                            const v = parseFloat(e.target.value);
-                            if (!isNaN(v)) setFormData((f) => ({ ...f, fundedAmount: v.toFixed(2) }));
+                            const v = parseFloat(stripCommas(e.target.value));
+                            if (!isNaN(v)) setFormData((f) => ({ ...f, fundedAmount: formatDollar(v.toFixed(2)) }));
                         }}
                     />
                 </div>
@@ -469,10 +487,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             onChange={(e) => {
                                 const pct = e.target.value;
                                 const pctNum = parseFloat(pct);
-                                const fundedNum = parseFloat(formData.fundedAmount);
+                                const fundedNum = parseFloat(stripCommas(formData.fundedAmount));
                                 const fee = pct !== "" && formData.fundedAmount !== ""
                                     ? ((pctNum / 100) * fundedNum).toFixed(2)
-                                    : formData.originationFee;
+                                    : stripCommas(formData.originationFee);
                                 const net = fee !== "" && formData.fundedAmount !== ""
                                     ? (fundedNum - parseFloat(fee)).toFixed(2)
                                     : formData.netFundedAmount;
@@ -483,25 +501,26 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     <div className="input-prefixed" style={{ flex: 1 }}>
                         <span className="input-prefix-symbol">$</span>
                         <input
-                            type="number"
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             placeholder="0.00"
                             value={formData.originationFee}
+                            onFocus={() => setFormData(f => ({ ...f, originationFee: stripCommas(f.originationFee) }))}
                             onChange={(e) => {
-                                const fee = e.target.value;
+                                const fee = stripCommas(e.target.value);
                                 const feeNum = parseFloat(fee);
-                                const fundedNum = parseFloat(formData.fundedAmount);
+                                const fundedNum = parseFloat(stripCommas(formData.fundedAmount));
                                 const pct = fee !== "" && formData.fundedAmount !== "" && fundedNum !== 0
                                     ? ((feeNum / fundedNum) * 100).toFixed(2)
                                     : formData.originationFeePercent;
                                 const net = fee !== "" && formData.fundedAmount !== ""
                                     ? (fundedNum - feeNum).toFixed(2)
-                                    : formData.fundedAmount !== "" ? parseFloat(formData.fundedAmount).toFixed(2) : "";
+                                    : formData.fundedAmount !== "" ? parseFloat(stripCommas(formData.fundedAmount)).toFixed(2) : "";
                                 setFormData({ ...formData, originationFee: fee, originationFeePercent: pct, netFundedAmount: net });
                             }}
                             onBlur={(e) => {
-                                const v = parseFloat(e.target.value);
-                                if (!isNaN(v)) setFormData((f) => ({ ...f, originationFee: v.toFixed(2) }));
+                                const v = parseFloat(stripCommas(e.target.value));
+                                if (!isNaN(v)) setFormData((f) => ({ ...f, originationFee: formatDollar(v.toFixed(2)) }));
                             }}
                         />
                     </div>
@@ -511,7 +530,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 <label>Net Funded Amount</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
-                    <input type="number" step="0.01" value={formData.netFundedAmount} disabled />
+                    <input type="text" value={formatDollar(formData.netFundedAmount)} disabled />
                 </div>
             </div>
 
@@ -555,7 +574,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 ? (buyNum + feeNum / 100).toFixed(2)
                                 : formData.buyRate !== "" ? formData.buyRate : "";
                             const commission = fee !== "" && formData.fundedAmount !== ""
-                                ? ((feeNum / 100) * parseFloat(formData.fundedAmount)).toFixed(2)
+                                ? ((feeNum / 100) * parseFloat(stripCommas(formData.fundedAmount))).toFixed(2)
                                 : formData.brokerCommission;
                             const total = calcTotalPayback(formData.fundedAmount, factor);
                             const weekly = formData.weeklyOrDailyPayment === "true";
@@ -570,7 +589,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 <label>Broker Commission</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
-                    <input type="number" step="0.01" value={formData.brokerCommission} disabled />
+                    <input type="text" value={formatDollar(formData.brokerCommission)} disabled />
                 </div>
             </div>
             <div className="form-row">
@@ -614,14 +633,14 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 <label>Total Payback</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
-                    <input type="number" step="0.01" value={formData.totalPaybackAmount} disabled />
+                    <input type="text" value={formatDollar(formData.totalPaybackAmount)} disabled />
                 </div>
             </div>
             <div className="form-row">
                 <label>Payment Amount</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
-                    <input type="number" step="0.01" value={formData.paymentAmount} disabled />
+                    <input type="text" value={formatDollar(formData.paymentAmount)} disabled />
                 </div>
             </div>
 
@@ -635,8 +654,15 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         checked={formData.hasDefaulted}
                         onChange={(e) => {
                             const checked = e.target.checked;
-                            const owed = checked ? calcAmountOwed(formData.fundedDate, formData.defaultDate, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
-                            setFormData({ ...formData, hasDefaulted: checked, amountOwedAsOfDefault: owed });
+                            const today = new Date().toISOString().split("T")[0];
+                            const dateVal = checked ? today : formData.defaultDate;
+                            let days = "";
+                            if (checked && dateVal && formData.fundedDate) {
+                                const diff = parseDateUTC(dateVal) - parseDateUTC(formData.fundedDate);
+                                days = Math.floor(diff / 86400000).toString();
+                            }
+                            const owed = checked ? calcAmountOwed(formData.fundedDate, dateVal, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
+                            setFormData({ ...formData, hasDefaulted: checked, defaultDate: dateVal, defaultDays: days, amountOwedAsOfDefault: owed });
                         }}
                     />
                     <input
@@ -678,13 +704,31 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 <label>Amount Owed as of Default</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
-                    <input type="number" step="0.01" value={formData.amountOwedAsOfDefault} disabled />
+                    <input type="text" value={formatDollar(formData.amountOwedAsOfDefault)} disabled />
+                </div>
+            </div>
+            <div className="form-row">
+                <label>Outstanding Amount Owed</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input type="text" value={(() => {
+                        // Don't calculate if deal has been renewed or defaulted
+                        if (editingDeal?.renewalDealId || formData.hasDefaulted) return "";
+                        if (!formData.fundedDate || !formData.totalPaybackAmount || !formData.paymentAmount) return "";
+                        const today = new Date().toISOString().split("T")[0];
+                        const days = Math.floor((parseDateUTC(today) - parseDateUTC(formData.fundedDate)) / 86400000);
+                        if (days <= 0) return "";
+                        const weekly = formData.weeklyOrDailyPayment === "true";
+                        const paymentsMade = weekly ? Math.floor(days / 5) : days;
+                        const owed = parseFloat(stripCommas(formData.totalPaybackAmount)) - paymentsMade * parseFloat(stripCommas(formData.paymentAmount));
+                        return formatDollar((owed > 0 ? owed : 0).toFixed(2));
+                    })()} disabled />
                 </div>
             </div>
             {field("ROI", "roi", "number", "%")}
-            {field("Renewal Date", "renewalDate", "date")}
 
-            {/* Row 6: Renewal-specific fields (only shown for renewals) */}
+            {/* Row 6: Renewal Date + Renewal-specific fields */}
+            {field("Renewal Date", "renewalDate", "date")}
             {formData.typeOfDeal === "renewal" && (
                 <>
                     <div className="form-row">
@@ -692,14 +736,15 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
                             <input
-                                type="number"
-                                step="0.01"
+                                type="text"
+                                inputMode="decimal"
                                 placeholder="0.00"
                                 value={formData.rolledBalance}
-                                onChange={(e) => setFormData({ ...formData, rolledBalance: e.target.value })}
+                                onFocus={() => setFormData(f => ({ ...f, rolledBalance: stripCommas(f.rolledBalance) }))}
+                                onChange={(e) => setFormData({ ...formData, rolledBalance: stripCommas(e.target.value) })}
                                 onBlur={(e) => {
-                                    const v = parseFloat(e.target.value);
-                                    if (!isNaN(v)) setFormData((f) => ({ ...f, rolledBalance: v.toFixed(2) }));
+                                    const v = parseFloat(stripCommas(e.target.value));
+                                    if (!isNaN(v)) setFormData((f) => ({ ...f, rolledBalance: formatDollar(v.toFixed(2)) }));
                                 }}
                             />
                         </div>
@@ -709,14 +754,15 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
                             <input
-                                type="number"
-                                step="0.01"
+                                type="text"
+                                inputMode="decimal"
                                 placeholder="0.00"
                                 value={formData.netNewCashOut}
-                                onChange={(e) => setFormData({ ...formData, netNewCashOut: e.target.value })}
+                                onFocus={() => setFormData(f => ({ ...f, netNewCashOut: stripCommas(f.netNewCashOut) }))}
+                                onChange={(e) => setFormData({ ...formData, netNewCashOut: stripCommas(e.target.value) })}
                                 onBlur={(e) => {
-                                    const v = parseFloat(e.target.value);
-                                    if (!isNaN(v)) setFormData((f) => ({ ...f, netNewCashOut: v.toFixed(2) }));
+                                    const v = parseFloat(stripCommas(e.target.value));
+                                    if (!isNaN(v)) setFormData((f) => ({ ...f, netNewCashOut: formatDollar(v.toFixed(2)) }));
                                 }}
                             />
                         </div>
@@ -777,7 +823,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             </thead>
                             <tbody>
                                 {orderedDeals.map(({ deal, indent }) => (
-                                    <tr key={deal._id} className={editingDeal?._id === deal._id ? "selected-row" : ""}>
+                                    <tr key={deal._id} className={editingDeal?._id === deal._id ? "selected-row" : ""} onDoubleClick={() => startEdit(deal)}>
                                         <td style={indent ? { paddingLeft: "2rem" } : undefined}>
                                             {indent ? "↳ " : ""}{deal.broker?.brokerName ?? "-"}
                                         </td>
@@ -792,6 +838,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             <button className="btn btn-sm btn-success" onClick={() => startEdit(deal)} disabled={isAdding || showForm}>Edit</button>
                                             <button className="btn btn-sm btn-danger" onClick={() => handleDelete(deal)} disabled={isAdding || showForm || !!deal.renewalDealId}>Delete</button>
                                             <button className="btn btn-sm" onClick={() => handleRenew(deal)} disabled={isAdding || showForm || !!deal.renewalDealId}>Renew</button>
+                                            <button className="btn btn-sm" onClick={() => showRenewal(deal)} disabled={isAdding || showForm || !deal.renewalDealId}>Show Renewal</button>
                                         </td>
                                     </tr>
                                 ))}
@@ -822,6 +869,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     <div className="dialog-footer">
                         <button className="btn btn-primary" onClick={handleSave}>Save</button>
                         <button className="btn" onClick={() => { cancelForm(); handleRenew(editingDeal); }} disabled={!!editingDeal.renewalDealId}>Renew Deal</button>
+                        <button className="btn" onClick={() => showRenewal(editingDeal)} disabled={!editingDeal.renewalDealId}>Show Renewal</button>
                         <button className="btn" onClick={cancelForm}>Cancel</button>
                     </div>
                 </div>

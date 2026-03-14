@@ -297,7 +297,7 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
                             </thead>
                             <tbody>
                                 {displayedUsers.map((user) => (
-                                    <tr key={user._id} className={editingUser?._id === user._id ? "selected-row" : ""}>
+                                    <tr key={user._id} className={editingUser?._id === user._id ? "selected-row" : ""} onDoubleClick={() => startEdit(user)}>
                                         <td>{user.email}</td>
                                         <td>{user.firstName} {user.lastName}</td>
                                         <td>{user.role}</td>
