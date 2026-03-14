@@ -292,7 +292,7 @@ main {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding-top: calc(5vh + 100px);
+  padding-top: 20px;
   z-index: 2000;
 }
 
@@ -302,7 +302,7 @@ main {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   width: 90%;
   max-width: 700px;
-  max-height: 85vh;
+  max-height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
 }
@@ -452,6 +452,40 @@ main {
   margin: 0 0 0.75rem 0;
   font-size: 1rem;
   color: #333;
+}
+
+/* Deal form sections */
+.form-section {
+  margin-bottom: 1rem;
+}
+
+.form-section-header {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #2c3e50;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 2px solid #3d5470;
+}
+
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0 1rem;
+}
+
+.form-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0 1rem;
+}
+
+.form-grid-5 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0 1rem;
 }
 
 .form-row {

@@ -415,511 +415,436 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const showForm = editingDeal !== null;
 
     const formGrid = (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0 1rem" }}>
-            {/* Row 1: Broker | Position | MCA History | (empty) */}
-            <div className="form-row" title="Select the broker associated with this deal">
-                <label>Broker</label>
-                <select
-                    value={formData.broker}
-                    onChange={(e) => setFormData({ ...formData, broker: e.target.value })}
-                >
-                    <option value="">-- None --</option>
-                    {brokers.map((b) => (
-                        <option key={b._id} value={b._id}>{b.brokerName}</option>
-                    ))}
-                </select>
-            </div>
-            <div className="form-row" title="Number of lenders assigned to this deal">
-                <label>Position</label>
-                <input type="text" value={formData.position} onChange={(e) => setFormData({ ...formData, position: e.target.value })} />
-            </div>
-            <div className="form-row" title="Has this client had a previous Merchant Cash Advance?">
-                <label>MCA History</label>
-                <select
-                    value={formData.mcaHistory}
-                    onChange={(e) => setFormData({ ...formData, mcaHistory: e.target.value })}
-                >
-                    <option value="">-- Select --</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                </select>
-            </div>
-            <div />
-
-            {/* Row 2: Funded Date | Funded Amount | Origination Fee | Net Funded Amount */}
-            <div className="form-row" title="Date the deal was funded">
-                <label>Funded Date</label>
-                <input type="date" value={formData.fundedDate} onChange={(e) => setFormData({ ...formData, fundedDate: e.target.value })} />
-            </div>
-            <div className="form-row" title="Total dollar amount funded for this deal">
-                <label>Funded Amount</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={formData.fundedAmount}
-                        onFocus={() => setFormData(f => ({ ...f, fundedAmount: stripCommas(f.fundedAmount) }))}
-                        onChange={(e) => {
-                            const funded = stripCommas(e.target.value);
-                            const fundedNum = parseFloat(funded);
-                            const feeNum = parseFloat(stripCommas(formData.originationFee));
-                            const net = funded !== "" && formData.originationFee !== ""
-                                ? (fundedNum - feeNum).toFixed(2)
-                                : funded !== "" ? parseFloat(funded).toFixed(2) : "";
-                            const pct = funded !== "" && formData.originationFee !== "" && fundedNum !== 0
-                                ? ((feeNum / fundedNum) * 100).toFixed(2)
-                                : formData.originationFeePercent;
-                            const commission = funded !== "" && formData.brokerFee !== ""
-                                ? ((parseFloat(formData.brokerFee) / 100) * fundedNum).toFixed(2)
-                                : formData.brokerCommission;
-                            const total = calcTotalPayback(funded, formData.factorRate);
-                            const weekly = formData.weeklyOrDailyPayment === "true";
-                            const payment = calcPayment(total, formData.loanTerm, weekly);
-                            const owed = formData.hasDefaulted ? calcAmountOwed(funded, formData.defaultDate, payment, total, weekly) : "";
-                            setFormData({ ...formData, fundedAmount: funded, netFundedAmount: net, originationFeePercent: pct, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
-                        }}
-                        onBlur={(e) => {
-                            const v = parseFloat(stripCommas(e.target.value));
-                            if (!isNaN(v)) setFormData((f) => ({ ...f, fundedAmount: formatDollar(v.toFixed(2)) }));
-                        }}
-                    />
-                </div>
-            </div>
-            <div className="form-row" title="Fee charged for originating the deal. Enter as % or $; the other is calculated automatically. Net Funded = Funded Amount - Origination Fee">
-                <label>Origination Fee</label>
-                <div style={{ display: "flex", gap: "0.4rem" }}>
-                    <div className="input-prefixed" style={{ flex: 1 }}>
-                        <span className="input-prefix-symbol">%</span>
-                        <input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={formData.originationFeePercent}
-                            onChange={(e) => {
-                                const pct = e.target.value;
-                                const pctNum = parseFloat(pct);
-                                const fundedNum = parseFloat(stripCommas(formData.fundedAmount));
-                                const fee = pct !== "" && formData.fundedAmount !== ""
-                                    ? ((pctNum / 100) * fundedNum).toFixed(2)
-                                    : stripCommas(formData.originationFee);
-                                const net = fee !== "" && formData.fundedAmount !== ""
-                                    ? (fundedNum - parseFloat(fee)).toFixed(2)
-                                    : formData.netFundedAmount;
-                                setFormData({ ...formData, originationFeePercent: pct, originationFee: fee, netFundedAmount: net });
-                            }}
-                        />
+        <div>
+            {/* Section 1: Deal Details */}
+            <div className="form-section">
+                <div className="form-section-header">Deal Details</div>
+                <div className="form-grid-4">
+                    <div className="form-row" title="Select the broker associated with this deal">
+                        <label>Broker</label>
+                        <select value={formData.broker} onChange={(e) => setFormData({ ...formData, broker: e.target.value })}>
+                            <option value="">-- None --</option>
+                            {brokers.map((b) => (<option key={b._id} value={b._id}>{b.brokerName}</option>))}
+                        </select>
                     </div>
-                    <div className="input-prefixed" style={{ flex: 1 }}>
-                        <span className="input-prefix-symbol">$</span>
-                        <input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="0.00"
-                            value={formData.originationFee}
-                            onFocus={() => setFormData(f => ({ ...f, originationFee: stripCommas(f.originationFee) }))}
-                            onChange={(e) => {
-                                const fee = stripCommas(e.target.value);
-                                const feeNum = parseFloat(fee);
-                                const fundedNum = parseFloat(stripCommas(formData.fundedAmount));
-                                const pct = fee !== "" && formData.fundedAmount !== "" && fundedNum !== 0
-                                    ? ((feeNum / fundedNum) * 100).toFixed(2)
-                                    : formData.originationFeePercent;
-                                const net = fee !== "" && formData.fundedAmount !== ""
-                                    ? (fundedNum - feeNum).toFixed(2)
-                                    : formData.fundedAmount !== "" ? parseFloat(stripCommas(formData.fundedAmount)).toFixed(2) : "";
-                                setFormData({ ...formData, originationFee: fee, originationFeePercent: pct, netFundedAmount: net });
-                            }}
-                            onBlur={(e) => {
-                                const v = parseFloat(stripCommas(e.target.value));
-                                if (!isNaN(v)) setFormData((f) => ({ ...f, originationFee: formatDollar(v.toFixed(2)) }));
-                            }}
-                        />
+                    <div className="form-row" title="Date the deal was funded">
+                        <label>Funded Date</label>
+                        <input type="date" value={formData.fundedDate} onChange={(e) => setFormData({ ...formData, fundedDate: e.target.value })} />
+                    </div>
+                    <div className="form-row" title="Number of lenders assigned to this deal">
+                        <label>Position</label>
+                        <input type="text" value={formData.position} onChange={(e) => setFormData({ ...formData, position: e.target.value })} />
+                    </div>
+                    <div className="form-row" title="Has this client had a previous Merchant Cash Advance?">
+                        <label>MCA History</label>
+                        <select value={formData.mcaHistory} onChange={(e) => setFormData({ ...formData, mcaHistory: e.target.value })}>
+                            <option value="">-- Select --</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                        </select>
                     </div>
                 </div>
             </div>
-            <div className="form-row" title="Calculated: Funded Amount minus Origination Fee">
-                <label>Net Funded Amount</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input type="text" value={formatDollar(formData.netFundedAmount)} disabled />
+
+            {/* Section 2: Funding */}
+            <div className="form-section">
+                <div className="form-section-header">Funding</div>
+                <div className="form-grid-3">
+                    <div className="form-row" title="Total dollar amount funded for this deal">
+                        <label>Funded Amount</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" inputMode="decimal" placeholder="0.00" value={formData.fundedAmount}
+                                onFocus={() => setFormData(f => ({ ...f, fundedAmount: stripCommas(f.fundedAmount) }))}
+                                onChange={(e) => {
+                                    const funded = stripCommas(e.target.value);
+                                    const fundedNum = parseFloat(funded);
+                                    const feeNum = parseFloat(stripCommas(formData.originationFee));
+                                    const net = funded !== "" && formData.originationFee !== "" ? (fundedNum - feeNum).toFixed(2) : funded !== "" ? parseFloat(funded).toFixed(2) : "";
+                                    const pct = funded !== "" && formData.originationFee !== "" && fundedNum !== 0 ? ((feeNum / fundedNum) * 100).toFixed(2) : formData.originationFeePercent;
+                                    const commission = funded !== "" && formData.brokerFee !== "" ? ((parseFloat(formData.brokerFee) / 100) * fundedNum).toFixed(2) : formData.brokerCommission;
+                                    const total = calcTotalPayback(funded, formData.factorRate);
+                                    const weekly = formData.weeklyOrDailyPayment === "true";
+                                    const payment = calcPayment(total, formData.loanTerm, weekly);
+                                    const owed = formData.hasDefaulted ? calcAmountOwed(funded, formData.defaultDate, payment, total, weekly) : "";
+                                    setFormData({ ...formData, fundedAmount: funded, netFundedAmount: net, originationFeePercent: pct, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
+                                }}
+                                onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, fundedAmount: formatDollar(v.toFixed(2)) })); }}
+                            />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Fee charged for originating the deal. Enter as % or $; the other is calculated automatically">
+                        <label>Origination Fee</label>
+                        <div style={{ display: "flex", gap: "0.4rem" }}>
+                            <div className="input-prefixed" style={{ flex: 1 }}>
+                                <span className="input-prefix-symbol">%</span>
+                                <input type="number" step="0.01" placeholder="0.00" value={formData.originationFeePercent}
+                                    onChange={(e) => {
+                                        const pct = e.target.value; const pctNum = parseFloat(pct); const fundedNum = parseFloat(stripCommas(formData.fundedAmount));
+                                        const fee = pct !== "" && formData.fundedAmount !== "" ? ((pctNum / 100) * fundedNum).toFixed(2) : stripCommas(formData.originationFee);
+                                        const net = fee !== "" && formData.fundedAmount !== "" ? (fundedNum - parseFloat(fee)).toFixed(2) : formData.netFundedAmount;
+                                        setFormData({ ...formData, originationFeePercent: pct, originationFee: fee, netFundedAmount: net });
+                                    }}
+                                />
+                            </div>
+                            <div className="input-prefixed" style={{ flex: 1 }}>
+                                <span className="input-prefix-symbol">$</span>
+                                <input type="text" inputMode="decimal" placeholder="0.00" value={formData.originationFee}
+                                    onFocus={() => setFormData(f => ({ ...f, originationFee: stripCommas(f.originationFee) }))}
+                                    onChange={(e) => {
+                                        const fee = stripCommas(e.target.value); const feeNum = parseFloat(fee); const fundedNum = parseFloat(stripCommas(formData.fundedAmount));
+                                        const pct = fee !== "" && formData.fundedAmount !== "" && fundedNum !== 0 ? ((feeNum / fundedNum) * 100).toFixed(2) : formData.originationFeePercent;
+                                        const net = fee !== "" && formData.fundedAmount !== "" ? (fundedNum - feeNum).toFixed(2) : formData.fundedAmount !== "" ? parseFloat(stripCommas(formData.fundedAmount)).toFixed(2) : "";
+                                        setFormData({ ...formData, originationFee: fee, originationFeePercent: pct, netFundedAmount: net });
+                                    }}
+                                    onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, originationFee: formatDollar(v.toFixed(2)) })); }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: Funded Amount minus Origination Fee">
+                        <label>Net Funded Amount</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" value={formatDollar(formData.netFundedAmount)} disabled />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Row 3: Buy Rate | Broker Fee | Broker Commission | Factor Rate */}
-            <div className="form-row" title="The base rate charged to the borrower before broker fees">
-                <label>Buy Rate</label>
-                <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={formData.buyRate}
-                    onChange={(e) => {
-                        const buy = e.target.value;
-                        const buyNum = parseFloat(buy);
-                        const feeNum = parseFloat(formData.brokerFee);
-                        const factor = buy !== "" && formData.brokerFee !== ""
-                            ? (buyNum + feeNum / 100).toFixed(2)
-                            : buy !== "" ? buy : "";
-                        const total = calcTotalPayback(formData.fundedAmount, factor);
-                        const weekly = formData.weeklyOrDailyPayment === "true";
-                        const payment = calcPayment(total, formData.loanTerm, weekly);
-                        const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, total, weekly) : "";
-                        setFormData({ ...formData, buyRate: buy, factorRate: factor, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
-                    }}
-                />
-            </div>
-            <div className="form-row" title="Broker's fee as a percentage. Commission = (Broker Fee / 100) x Funded Amount">
-                <label>Broker Fee</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">%</span>
-                    <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={formData.brokerFee}
-                        onChange={(e) => {
-                            const fee = e.target.value;
-                            const feeNum = parseFloat(fee);
-                            const buyNum = parseFloat(formData.buyRate);
-                            const factor = fee !== "" && formData.buyRate !== ""
-                                ? (buyNum + feeNum / 100).toFixed(2)
-                                : formData.buyRate !== "" ? formData.buyRate : "";
-                            const commission = fee !== "" && formData.fundedAmount !== ""
-                                ? ((feeNum / 100) * parseFloat(stripCommas(formData.fundedAmount))).toFixed(2)
-                                : formData.brokerCommission;
-                            const total = calcTotalPayback(formData.fundedAmount, factor);
-                            const weekly = formData.weeklyOrDailyPayment === "true";
-                            const payment = calcPayment(total, formData.loanTerm, weekly);
-                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, total, weekly) : "";
-                            setFormData({ ...formData, brokerFee: fee, factorRate: factor, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
-                        }}
-                    />
-                </div>
-            </div>
-            <div className="form-row" title="Calculated: (Broker Fee % / 100) x Funded Amount">
-                <label>Broker Commission</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input type="text" value={formatDollar(formData.brokerCommission)} disabled />
-                </div>
-            </div>
-            <div className="form-row" title="Calculated: Buy Rate + (Broker Fee / 100)">
-                <label>Factor Rate</label>
-                <input type="number" step="0.01" value={formData.factorRate} disabled />
-            </div>
-
-            {/* Row 4: Payment Frequency | Loan Term | Total Payback | Payment Amount */}
-            <div className="form-row" title="How often payments are made: Daily or Weekly">
-                <label>Payment Frequency</label>
-                <select
-                    value={formData.weeklyOrDailyPayment}
-                    onChange={(e) => {
-                        const weekly = e.target.value === "true";
-                        const payment = calcPayment(formData.totalPaybackAmount, formData.loanTerm, weekly);
-                        const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, formData.totalPaybackAmount, weekly) : "";
-                        setFormData({ ...formData, weeklyOrDailyPayment: e.target.value, paymentAmount: payment, amountOwedAsOfDefault: owed });
-                    }}
-                >
-                    <option value="false">Daily</option>
-                    <option value="true">Weekly</option>
-                </select>
-            </div>
-            <div className="form-row" title="Duration of the loan in calendar days">
-                <label>Loan Term (days)</label>
-                <input
-                    type="number"
-                    step="1"
-                    placeholder="0"
-                    value={formData.loanTerm}
-                    onChange={(e) => {
-                        const term = e.target.value;
-                        const weekly = formData.weeklyOrDailyPayment === "true";
-                        const payment = calcPayment(formData.totalPaybackAmount, term, weekly);
-                        const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, formData.totalPaybackAmount, weekly) : "";
-                        setFormData({ ...formData, loanTerm: term, paymentAmount: payment, amountOwedAsOfDefault: owed });
-                    }}
-                />
-            </div>
-            <div className="form-row" title="Calculated: Weekly = Total Payback / (Term / 5), Daily = Total Payback / Term">
-                <label>Payment Amount</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input type="text" value={formatDollar(formData.paymentAmount)} disabled />
-                </div>
-            </div>
-            <div className="form-row" title="Calculated: Funded Amount x Factor Rate">
-                <label>Total Payback</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input type="text" value={formatDollar(formData.totalPaybackAmount)} disabled />
+            {/* Section 3: Rates & Terms */}
+            <div className="form-section">
+                <div className="form-section-header">Rates &amp; Terms</div>
+                <div className="form-grid-4">
+                    <div className="form-row" title="The base rate charged to the borrower before broker fees">
+                        <label>Buy Rate</label>
+                        <input type="number" step="0.01" placeholder="0.00" value={formData.buyRate}
+                            onChange={(e) => {
+                                const buy = e.target.value; const buyNum = parseFloat(buy); const feeNum = parseFloat(formData.brokerFee);
+                                const factor = buy !== "" && formData.brokerFee !== "" ? (buyNum + feeNum / 100).toFixed(2) : buy !== "" ? buy : "";
+                                const total = calcTotalPayback(formData.fundedAmount, factor);
+                                const weekly = formData.weeklyOrDailyPayment === "true";
+                                const payment = calcPayment(total, formData.loanTerm, weekly);
+                                const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, total, weekly) : "";
+                                setFormData({ ...formData, buyRate: buy, factorRate: factor, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
+                            }}
+                        />
+                    </div>
+                    <div className="form-row" title="Broker's fee as a percentage. Commission = (Broker Fee / 100) x Funded Amount">
+                        <label>Broker Fee</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">%</span>
+                            <input type="number" step="0.01" placeholder="0.00" value={formData.brokerFee}
+                                onChange={(e) => {
+                                    const fee = e.target.value; const feeNum = parseFloat(fee); const buyNum = parseFloat(formData.buyRate);
+                                    const factor = fee !== "" && formData.buyRate !== "" ? (buyNum + feeNum / 100).toFixed(2) : formData.buyRate !== "" ? formData.buyRate : "";
+                                    const commission = fee !== "" && formData.fundedAmount !== "" ? ((feeNum / 100) * parseFloat(stripCommas(formData.fundedAmount))).toFixed(2) : formData.brokerCommission;
+                                    const total = calcTotalPayback(formData.fundedAmount, factor);
+                                    const weekly = formData.weeklyOrDailyPayment === "true";
+                                    const payment = calcPayment(total, formData.loanTerm, weekly);
+                                    const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, total, weekly) : "";
+                                    setFormData({ ...formData, brokerFee: fee, factorRate: factor, brokerCommission: commission, totalPaybackAmount: total, paymentAmount: payment, amountOwedAsOfDefault: owed });
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: (Broker Fee % / 100) x Funded Amount">
+                        <label>Broker Commission</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" value={formatDollar(formData.brokerCommission)} disabled />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: Buy Rate + (Broker Fee / 100)">
+                        <label>Factor Rate</label>
+                        <input type="number" step="0.01" value={formData.factorRate} disabled />
+                    </div>
+                    <div className="form-row" title="How often payments are made: Daily or Weekly">
+                        <label>Payment Frequency</label>
+                        <select value={formData.weeklyOrDailyPayment}
+                            onChange={(e) => {
+                                const weekly = e.target.value === "true";
+                                const payment = calcPayment(formData.totalPaybackAmount, formData.loanTerm, weekly);
+                                const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, formData.totalPaybackAmount, weekly) : "";
+                                setFormData({ ...formData, weeklyOrDailyPayment: e.target.value, paymentAmount: payment, amountOwedAsOfDefault: owed });
+                            }}>
+                            <option value="false">Daily</option>
+                            <option value="true">Weekly</option>
+                        </select>
+                    </div>
+                    <div className="form-row" title="Duration of the loan in calendar days">
+                        <label>Loan Term (days)</label>
+                        <input type="number" step="1" placeholder="0" value={formData.loanTerm}
+                            onChange={(e) => {
+                                const term = e.target.value; const weekly = formData.weeklyOrDailyPayment === "true";
+                                const payment = calcPayment(formData.totalPaybackAmount, term, weekly);
+                                const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, formData.defaultDate, payment, formData.totalPaybackAmount, weekly) : "";
+                                setFormData({ ...formData, loanTerm: term, paymentAmount: payment, amountOwedAsOfDefault: owed });
+                            }}
+                        />
+                    </div>
+                    <div className="form-row" title="Calculated: Weekly = Total Payback / (Term / 5), Daily = Total Payback / Term">
+                        <label>Payment Amount</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" value={formatDollar(formData.paymentAmount)} disabled />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: Funded Amount x Factor Rate">
+                        <label>Total Payback</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" value={formatDollar(formData.totalPaybackAmount)} disabled />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Row 5: Total Cash Out | Total Payback w/ Fees & Expenses | Net Profit | (empty) */}
-            <div className="form-row" title="Calculated: Net Funded Amount + Broker Commission + Miscellaneous Expenses">
-                <label>Total Cash Out</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input type="text" value={(() => {
-                        const net = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
-                        const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
-                        const misc = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
-                        const total = net + comm + misc;
-                        return total > 0 ? formatDollar(total.toFixed(2)) : "";
-                    })()} disabled />
-                </div>
-            </div>
-            <div className="form-row" title="Calculated: Total Payback + Miscellaneous Fees + Miscellaneous Expenses - Discount">
-                <label>Total Payback w/ Fees &amp; Expenses</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input type="text" value={(() => {
-                        const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
-                        const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
-                        const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
-                        const disc = parseFloat(stripCommas(formData.discount)) || 0;
-                        const total = payback + fees + expenses - disc;
-                        return total > 0 ? formatDollar(total.toFixed(2)) : "";
-                    })()} disabled />
-                </div>
-            </div>
-            <div className="form-row" title="Net profit from this deal after all costs and expenses">
-                <label>Net Profit</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={formData.netProfit}
-                        onFocus={() => setFormData(f => ({ ...f, netProfit: stripCommas(f.netProfit) }))}
-                        onChange={(e) => setFormData({ ...formData, netProfit: stripCommas(e.target.value) })}
-                        onBlur={(e) => {
-                            const v = parseFloat(stripCommas(e.target.value));
-                            if (!isNaN(v)) setFormData((f) => ({ ...f, netProfit: formatDollar(v.toFixed(2)) }));
-                        }}
-                    />
-                </div>
-            </div>
-            <div />
-
-            {/* Row 6: Misc Fees | Misc Expenses | Discount | (empty) */}
-            <div className="form-row" title="Any additional miscellaneous fees applied to this deal">
-                <label>Miscellaneous Fees</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={formData.miscellaneousFees}
-                        onFocus={() => setFormData(f => ({ ...f, miscellaneousFees: stripCommas(f.miscellaneousFees) }))}
-                        onChange={(e) => setFormData({ ...formData, miscellaneousFees: stripCommas(e.target.value) })}
-                        onBlur={(e) => {
-                            const v = parseFloat(stripCommas(e.target.value));
-                            if (!isNaN(v)) setFormData((f) => ({ ...f, miscellaneousFees: formatDollar(v.toFixed(2)) }));
-                        }}
-                    />
-                </div>
-            </div>
-            <div className="form-row" title="Any additional miscellaneous expenses incurred on this deal">
-                <label>Miscellaneous Expenses</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={formData.miscellaneousExpenses}
-                        onFocus={() => setFormData(f => ({ ...f, miscellaneousExpenses: stripCommas(f.miscellaneousExpenses) }))}
-                        onChange={(e) => setFormData({ ...formData, miscellaneousExpenses: stripCommas(e.target.value) })}
-                        onBlur={(e) => {
-                            const v = parseFloat(stripCommas(e.target.value));
-                            if (!isNaN(v)) setFormData((f) => ({ ...f, miscellaneousExpenses: formatDollar(v.toFixed(2)) }));
-                        }}
-                    />
-                </div>
-            </div>
-            <div className="form-row" title="Discount amount applied to this deal">
-                <label>Discount</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={formData.discount}
-                        onFocus={() => setFormData(f => ({ ...f, discount: stripCommas(f.discount) }))}
-                        onChange={(e) => setFormData({ ...formData, discount: stripCommas(e.target.value) })}
-                        onBlur={(e) => {
-                            const v = parseFloat(stripCommas(e.target.value));
-                            if (!isNaN(v)) setFormData((f) => ({ ...f, discount: formatDollar(v.toFixed(2)) }));
-                        }}
-                    />
-                </div>
-            </div>
-            <div />
-
-            {/* Row 6: Outstanding Amount Owed | Amount Paid In | Expected ROI | Current ROI */}
-            <div className="form-row" title="Calculated: Total Payback w/ Fees & Expenses - Amount Paid In">
-                <label>Outstanding Amount Owed</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input type="text" value={(() => {
-                        const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
-                        const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
-                        const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
-                        const disc = parseFloat(stripCommas(formData.discount)) || 0;
-                        const totalWithFees = payback + fees + expenses - disc;
-                        const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
-                        const owed = totalWithFees - paidIn;
-                        return totalWithFees > 0 ? formatDollar((owed > 0 ? owed : 0).toFixed(2)) : "";
-                    })()} disabled />
-                </div>
-            </div>
-            <div className="form-row" title="Total amount paid in by the borrower to date">
-                <label>Amount Paid In</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={formData.amountPaidIn}
-                        onFocus={() => setFormData(f => ({ ...f, amountPaidIn: stripCommas(f.amountPaidIn) }))}
-                        onChange={(e) => setFormData({ ...formData, amountPaidIn: stripCommas(e.target.value) })}
-                        onBlur={(e) => {
-                            const v = parseFloat(stripCommas(e.target.value));
-                            if (!isNaN(v)) setFormData((f) => ({ ...f, amountPaidIn: formatDollar(v.toFixed(2)) }));
-                        }}
-                    />
-                </div>
-            </div>
-            <div className="form-row" title="Expected Return on Investment percentage for this deal">
-                <label>Expected ROI</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">%</span>
-                    <input type="number" step="0.01" placeholder="0.00" value={formData.roi} onChange={(e) => setFormData({ ...formData, roi: e.target.value })} />
-                </div>
-            </div>
-            <div className="form-row" title="Current Return on Investment based on actual performance">
-                <label>Current ROI</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">%</span>
-                    <input type="number" step="0.01" placeholder="0.00" value={formData.currentRoi} onChange={(e) => setFormData({ ...formData, currentRoi: e.target.value })} />
+            {/* Section 4: Costs & Fees */}
+            <div className="form-section">
+                <div className="form-section-header">Costs &amp; Fees</div>
+                <div className="form-grid-5">
+                    <div className="form-row" title="Any additional miscellaneous fees applied to this deal">
+                        <label>Miscellaneous Fees</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" inputMode="decimal" placeholder="0.00" value={formData.miscellaneousFees}
+                                onFocus={() => setFormData(f => ({ ...f, miscellaneousFees: stripCommas(f.miscellaneousFees) }))}
+                                onChange={(e) => setFormData({ ...formData, miscellaneousFees: stripCommas(e.target.value) })}
+                                onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, miscellaneousFees: formatDollar(v.toFixed(2)) })); }}
+                            />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Any additional miscellaneous expenses incurred on this deal">
+                        <label>Miscellaneous Expenses</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" inputMode="decimal" placeholder="0.00" value={formData.miscellaneousExpenses}
+                                onFocus={() => setFormData(f => ({ ...f, miscellaneousExpenses: stripCommas(f.miscellaneousExpenses) }))}
+                                onChange={(e) => setFormData({ ...formData, miscellaneousExpenses: stripCommas(e.target.value) })}
+                                onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, miscellaneousExpenses: formatDollar(v.toFixed(2)) })); }}
+                            />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Discount amount applied to this deal">
+                        <label>Discount</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" inputMode="decimal" placeholder="0.00" value={formData.discount}
+                                onFocus={() => setFormData(f => ({ ...f, discount: stripCommas(f.discount) }))}
+                                onChange={(e) => setFormData({ ...formData, discount: stripCommas(e.target.value) })}
+                                onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, discount: formatDollar(v.toFixed(2)) })); }}
+                            />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: Net Funded Amount + Broker Commission + Miscellaneous Expenses">
+                        <label>Total Cash Out</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" value={(() => {
+                                const net = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
+                                const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
+                                const misc = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
+                                const total = net + comm + misc;
+                                return total > 0 ? formatDollar(total.toFixed(2)) : "";
+                            })()} disabled />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: Total Payback + Miscellaneous Fees + Miscellaneous Expenses - Discount">
+                        <label>Total Payback w/ Fees &amp; Expenses</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" value={(() => {
+                                const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
+                                const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
+                                const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
+                                const disc = parseFloat(stripCommas(formData.discount)) || 0;
+                                const total = payback + fees + expenses - disc;
+                                return total > 0 ? formatDollar(total.toFixed(2)) : "";
+                            })()} disabled />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Row 7: Default Date/Days | Amount Owed as of Default | (empty) | (empty) */}
-            <div className="form-row" title="Check to mark as defaulted. Date and days since funded are linked; changing one updates the other">
-                <label>Default Date / Days</label>
-                <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                    <input
-                        type="checkbox"
-                        style={{ width: "auto", flexShrink: 0 }}
-                        checked={formData.hasDefaulted}
-                        onChange={(e) => {
-                            const checked = e.target.checked;
-                            const today = new Date().toISOString().split("T")[0];
-                            const dateVal = checked ? today : formData.defaultDate;
-                            let days = "";
-                            if (checked && dateVal && formData.fundedDate) {
-                                const diff = parseDateUTC(dateVal) - parseDateUTC(formData.fundedDate);
-                                days = Math.floor(diff / 86400000).toString();
-                            }
-                            const owed = checked ? calcAmountOwed(formData.fundedDate, dateVal, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
-                            setFormData({ ...formData, hasDefaulted: checked, defaultDate: dateVal, defaultDays: days, amountOwedAsOfDefault: owed });
-                        }}
-                    />
-                    <input
-                        type="date"
-                        style={{ flex: 2 }}
-                        value={formData.defaultDate}
-                        disabled={!formData.hasDefaulted}
-                        onChange={(e) => {
-                            const dateVal = e.target.value;
-                            let days = "";
-                            if (dateVal && formData.fundedDate) {
-                                const diff = parseDateUTC(dateVal) - parseDateUTC(formData.fundedDate);
-                                days = Math.floor(diff / 86400000).toString();
-                            }
-                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, dateVal, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
-                            setFormData({ ...formData, defaultDate: dateVal, defaultDays: days, amountOwedAsOfDefault: owed });
-                        }}
-                    />
-                    <input
-                        type="number"
-                        style={{ flex: 1, minWidth: 0 }}
-                        placeholder="Days"
-                        value={formData.defaultDays}
-                        disabled={!formData.hasDefaulted}
-                        onChange={(e) => {
-                            const daysVal = e.target.value;
-                            let dateStr = "";
-                            if (daysVal !== "" && formData.fundedDate) {
-                                const ms = parseDateUTC(formData.fundedDate) + parseInt(daysVal) * 86400000;
-                                dateStr = new Date(ms).toISOString().split("T")[0];
-                            }
-                            const owed = formData.hasDefaulted ? calcAmountOwed(formData.fundedDate, dateStr, formData.paymentAmount, formData.totalPaybackAmount, formData.weeklyOrDailyPayment === "true") : "";
-                            setFormData({ ...formData, defaultDays: daysVal, defaultDate: dateStr, amountOwedAsOfDefault: owed });
-                        }}
-                    />
+            {/* Section 5: Performance */}
+            <div className="form-section">
+                <div className="form-section-header">Performance</div>
+                <div className="form-grid-5">
+                    <div className="form-row" title="Total amount paid in by the borrower to date">
+                        <label>Amount Paid In</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" inputMode="decimal" placeholder="0.00" value={formData.amountPaidIn}
+                                onFocus={() => setFormData(f => ({ ...f, amountPaidIn: stripCommas(f.amountPaidIn) }))}
+                                onChange={(e) => setFormData({ ...formData, amountPaidIn: stripCommas(e.target.value) })}
+                                onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, amountPaidIn: formatDollar(v.toFixed(2)) })); }}
+                            />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: Total Payback w/ Fees & Expenses - Amount Paid In">
+                        <label>Outstanding Amount Owed</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" value={(() => {
+                                const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
+                                const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
+                                const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
+                                const disc = parseFloat(stripCommas(formData.discount)) || 0;
+                                const totalWithFees = payback + fees + expenses - disc;
+                                const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
+                                const owed = totalWithFees - paidIn;
+                                return totalWithFees > 0 ? formatDollar((owed > 0 ? owed : 0).toFixed(2)) : "";
+                            })()} disabled />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: Amount Paid In - Total Cash Out">
+                        <label>Net Profit</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" value={(() => {
+                                const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
+                                const net = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
+                                const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
+                                const misc = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
+                                const totalCashOut = net + comm + misc;
+                                if (paidIn <= 0 && totalCashOut <= 0) return "";
+                                return formatDollar((paidIn - totalCashOut).toFixed(2));
+                            })()} disabled />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: (Total Payback w/ Fees & Expenses - Total Cash Out) / Total Payback w/ Fees & Expenses x 100">
+                        <label>Expected ROI</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">%</span>
+                            <input type="text" value={(() => {
+                                const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
+                                const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
+                                const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
+                                const disc = parseFloat(stripCommas(formData.discount)) || 0;
+                                const totalWithFees = payback + fees + expenses - disc;
+                                const netFunded = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
+                                const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
+                                const totalCashOut = netFunded + comm + expenses;
+                                if (totalWithFees <= 0) return "";
+                                return ((totalWithFees - totalCashOut) / totalWithFees * 100).toFixed(2);
+                            })()} disabled />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: (Amount Paid In - Total Cash Out) / Amount Paid In x 100">
+                        <label>Current ROI</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">%</span>
+                            <input type="text" value={(() => {
+                                const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
+                                const netFunded = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
+                                const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
+                                const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
+                                const totalCashOut = netFunded + comm + expenses;
+                                if (paidIn <= 0) return "";
+                                return ((paidIn - totalCashOut) / paidIn * 100).toFixed(2);
+                            })()} disabled />
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div className="form-row" title="Calculated: Total Payback minus payments made from Funded Date to Default Date">
-                <label>Amount Owed as of Default</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input type="text" value={formatDollar(formData.amountOwedAsOfDefault)} disabled />
-                </div>
-            </div>
-            <div />
-            <div />
 
-            {/* Row 7: Renewal-specific fields (only shown for renewals) */}
+            {/* Section 6: Default */}
+            <div className="form-section">
+                <div className="form-section-header">Default</div>
+                <div className="form-grid-3">
+                    <div className="form-row" title="Check to mark as defaulted. Date and days since funded are linked; changing one updates the other">
+                        <label>Default Date / Days</label>
+                        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                            <input type="checkbox" style={{ width: "auto", flexShrink: 0 }} checked={formData.hasDefaulted}
+                                onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    const today = new Date().toISOString().split("T")[0];
+                                    const dateVal = checked ? today : formData.defaultDate;
+                                    let days = "";
+                                    if (checked && dateVal && formData.fundedDate) {
+                                        const diff = parseDateUTC(dateVal) - parseDateUTC(formData.fundedDate);
+                                        days = Math.floor(diff / 86400000).toString();
+                                    }
+                                    let owedDefault = formData.amountOwedAsOfDefault;
+                                    if (checked) {
+                                        const currentOwed = parseFloat(stripCommas(formData.amountOwedAsOfDefault)) || 0;
+                                        if (!formData.amountOwedAsOfDefault || currentOwed === 0) {
+                                            const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
+                                            const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
+                                            const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
+                                            const disc = parseFloat(stripCommas(formData.discount)) || 0;
+                                            const totalWithFees = payback + fees + expenses - disc;
+                                            const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
+                                            const outstanding = totalWithFees - paidIn;
+                                            owedDefault = outstanding > 0 ? formatDollar(outstanding.toFixed(2)) : "";
+                                        }
+                                    }
+                                    setFormData({ ...formData, hasDefaulted: checked, defaultDate: dateVal, defaultDays: days, amountOwedAsOfDefault: owedDefault });
+                                }}
+                            />
+                            <input type="date" style={{ flex: 2 }} value={formData.defaultDate} disabled={!formData.hasDefaulted}
+                                onChange={(e) => {
+                                    const dateVal = e.target.value; let days = "";
+                                    if (dateVal && formData.fundedDate) { const diff = parseDateUTC(dateVal) - parseDateUTC(formData.fundedDate); days = Math.floor(diff / 86400000).toString(); }
+                                    setFormData({ ...formData, defaultDate: dateVal, defaultDays: days });
+                                }}
+                            />
+                            <input type="number" style={{ flex: 1, minWidth: 0 }} placeholder="Days" value={formData.defaultDays} disabled={!formData.hasDefaulted}
+                                onChange={(e) => {
+                                    const daysVal = e.target.value; let dateStr = "";
+                                    if (daysVal !== "" && formData.fundedDate) { const ms = parseDateUTC(formData.fundedDate) + parseInt(daysVal) * 86400000; dateStr = new Date(ms).toISOString().split("T")[0]; }
+                                    setFormData({ ...formData, defaultDays: daysVal, defaultDate: dateStr });
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Amount owed at time of default. Auto-populated from Outstanding Amount Owed when default is checked (if empty or zero)">
+                        <label>Amount Owed as of Default</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" inputMode="decimal" placeholder="0.00" value={formData.amountOwedAsOfDefault}
+                                disabled={!formData.hasDefaulted}
+                                onFocus={() => setFormData(f => ({ ...f, amountOwedAsOfDefault: stripCommas(f.amountOwedAsOfDefault) }))}
+                                onChange={(e) => setFormData({ ...formData, amountOwedAsOfDefault: stripCommas(e.target.value) })}
+                                onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, amountOwedAsOfDefault: formatDollar(v.toFixed(2)) })); }}
+                            />
+                        </div>
+                    </div>
+                    <div />
+                </div>
+            </div>
+
+            {/* Section 7: Renewal (only shown for renewals) */}
             {formData.typeOfDeal === "renewal" && (
-                <>
-                    <div className="form-row" title="Balance rolled over from the previous deal into this renewal">
-                        <label>Rolled Balance</label>
-                        <div className="input-prefixed">
-                            <span className="input-prefix-symbol">$</span>
-                            <input
-                                type="text"
-                                inputMode="decimal"
-                                placeholder="0.00"
-                                value={formData.rolledBalance}
-                                onFocus={() => setFormData(f => ({ ...f, rolledBalance: stripCommas(f.rolledBalance) }))}
-                                onChange={(e) => setFormData({ ...formData, rolledBalance: stripCommas(e.target.value) })}
-                                onBlur={(e) => {
-                                    const v = parseFloat(stripCommas(e.target.value));
-                                    if (!isNaN(v)) setFormData((f) => ({ ...f, rolledBalance: formatDollar(v.toFixed(2)) }));
-                                }}
-                            />
+                <div className="form-section">
+                    <div className="form-section-header">Renewal</div>
+                    <div className="form-grid-3">
+                        <div className="form-row" title="Balance rolled over from the previous deal into this renewal">
+                            <label>Rolled Balance</label>
+                            <div className="input-prefixed">
+                                <span className="input-prefix-symbol">$</span>
+                                <input type="text" inputMode="decimal" placeholder="0.00" value={formData.rolledBalance}
+                                    onFocus={() => setFormData(f => ({ ...f, rolledBalance: stripCommas(f.rolledBalance) }))}
+                                    onChange={(e) => setFormData({ ...formData, rolledBalance: stripCommas(e.target.value) })}
+                                    onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, rolledBalance: formatDollar(v.toFixed(2)) })); }}
+                                />
+                            </div>
                         </div>
-                    </div>
-                    <div className="form-row" title="New cash disbursed to the client as part of this renewal, excluding the rolled balance">
-                        <label>Net New Cash Out</label>
-                        <div className="input-prefixed">
-                            <span className="input-prefix-symbol">$</span>
-                            <input
-                                type="text"
-                                inputMode="decimal"
-                                placeholder="0.00"
-                                value={formData.netNewCashOut}
-                                onFocus={() => setFormData(f => ({ ...f, netNewCashOut: stripCommas(f.netNewCashOut) }))}
-                                onChange={(e) => setFormData({ ...formData, netNewCashOut: stripCommas(e.target.value) })}
-                                onBlur={(e) => {
-                                    const v = parseFloat(stripCommas(e.target.value));
-                                    if (!isNaN(v)) setFormData((f) => ({ ...f, netNewCashOut: formatDollar(v.toFixed(2)) }));
-                                }}
-                            />
+                        <div className="form-row" title="New cash disbursed to the client as part of this renewal, excluding the rolled balance">
+                            <label>Net New Cash Out</label>
+                            <div className="input-prefixed">
+                                <span className="input-prefix-symbol">$</span>
+                                <input type="text" inputMode="decimal" placeholder="0.00" value={formData.netNewCashOut}
+                                    onFocus={() => setFormData(f => ({ ...f, netNewCashOut: stripCommas(f.netNewCashOut) }))}
+                                    onChange={(e) => setFormData({ ...formData, netNewCashOut: stripCommas(e.target.value) })}
+                                    onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, netNewCashOut: formatDollar(v.toFixed(2)) })); }}
+                                />
+                            </div>
                         </div>
+                        <div />
                     </div>
-                    <div />
-                    <div />
-                </>
+                </div>
             )}
         </div>
     );
