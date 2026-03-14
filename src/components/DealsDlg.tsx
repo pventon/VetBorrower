@@ -51,6 +51,9 @@ interface DealFormData {
     totalPaybackAmount: string;
     hasDefaulted: boolean;
     amountOwedAsOfDefault: string;
+    rolledBalance: string;
+    netNewCashOut: string;
+    roi: string;
 }
 
 const emptyForm: DealFormData = {
@@ -76,6 +79,9 @@ const emptyForm: DealFormData = {
     totalPaybackAmount: "",
     hasDefaulted: false,
     amountOwedAsOfDefault: "",
+    rolledBalance: "",
+    netNewCashOut: "",
+    roi: "",
 };
 
 function formatCurrency(value: number | undefined): string {
@@ -198,6 +204,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 : deal.totalPaybackAmount?.toFixed(2) ?? "",
             hasDefaulted: deal.hasDefaulted ?? false,
             amountOwedAsOfDefault: deal.amountOwedAsOfDefault?.toFixed(2) ?? "",
+            rolledBalance: deal.rolledBalance?.toFixed(2) ?? "",
+            netNewCashOut: deal.netNewCashOut?.toFixed(2) ?? "",
+            roi: deal.roi?.toFixed(2) ?? "",
         });
         setFormError(null);
     };
@@ -236,6 +245,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             totalPaybackAmount: formData.totalPaybackAmount ? parseFloat(formData.totalPaybackAmount) : null,
             hasDefaulted: formData.hasDefaulted,
             amountOwedAsOfDefault: formData.amountOwedAsOfDefault ? parseFloat(formData.amountOwedAsOfDefault) : null,
+            rolledBalance: formData.rolledBalance ? parseFloat(formData.rolledBalance) : null,
+            netNewCashOut: formData.netNewCashOut ? parseFloat(formData.netNewCashOut) : null,
+            roi: formData.roi ? parseFloat(formData.roi) : null,
         };
 
         try {
@@ -669,8 +681,50 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     <input type="number" step="0.01" value={formData.amountOwedAsOfDefault} disabled />
                 </div>
             </div>
-            <div />
+            {field("ROI", "roi", "number", "%")}
             {field("Renewal Date", "renewalDate", "date")}
+
+            {/* Row 6: Renewal-specific fields (only shown for renewals) */}
+            {formData.typeOfDeal === "renewal" && (
+                <>
+                    <div className="form-row">
+                        <label>Rolled Balance</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={formData.rolledBalance}
+                                onChange={(e) => setFormData({ ...formData, rolledBalance: e.target.value })}
+                                onBlur={(e) => {
+                                    const v = parseFloat(e.target.value);
+                                    if (!isNaN(v)) setFormData((f) => ({ ...f, rolledBalance: v.toFixed(2) }));
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <div className="form-row">
+                        <label>Net New Cash Out</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={formData.netNewCashOut}
+                                onChange={(e) => setFormData({ ...formData, netNewCashOut: e.target.value })}
+                                onBlur={(e) => {
+                                    const v = parseFloat(e.target.value);
+                                    if (!isNaN(v)) setFormData((f) => ({ ...f, netNewCashOut: v.toFixed(2) }));
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <div />
+                    <div />
+                </>
+            )}
         </div>
     );
 
