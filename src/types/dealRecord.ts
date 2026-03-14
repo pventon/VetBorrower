@@ -43,6 +43,9 @@ export interface DealRecord {
   miscellaneousExpenses: number;
   discount: number;
   amountPaidIn: number;
+  totalCashOut: number;
+  totalPaybackWithFeesAndExpenses: number;
+  netProfit: number;
   rolledBalance: number;
   netNewCashOut: number;
   roi: number;

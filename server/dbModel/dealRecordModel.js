@@ -46,6 +46,9 @@ const dealSchema = new mongoose.Schema({
   miscellaneousExpenses: Number,
   discount: Number,
   amountPaidIn: Number,
+  totalCashOut: Number,
+  totalPaybackWithFeesAndExpenses: Number,
+  netProfit: Number,
 
   // Renewal-specific fields
   rolledBalance: Number,

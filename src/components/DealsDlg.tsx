@@ -54,6 +54,9 @@ interface DealFormData {
     miscellaneousExpenses: string;
     discount: string;
     amountPaidIn: string;
+    totalCashOut: string;
+    totalPaybackWithFeesAndExpenses: string;
+    netProfit: string;
     rolledBalance: string;
     netNewCashOut: string;
     roi: string;
@@ -86,6 +89,9 @@ const emptyForm: DealFormData = {
     miscellaneousExpenses: "",
     discount: "",
     amountPaidIn: "",
+    totalCashOut: "",
+    totalPaybackWithFeesAndExpenses: "",
+    netProfit: "",
     rolledBalance: "",
     netNewCashOut: "",
     roi: "",
@@ -227,6 +233,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             miscellaneousExpenses: deal.miscellaneousExpenses != null ? formatDollar(deal.miscellaneousExpenses.toFixed(2)) : "",
             discount: deal.discount != null ? formatDollar(deal.discount.toFixed(2)) : "",
             amountPaidIn: deal.amountPaidIn != null ? formatDollar(deal.amountPaidIn.toFixed(2)) : "",
+            totalCashOut: deal.totalCashOut != null ? formatDollar(deal.totalCashOut.toFixed(2)) : "",
+            totalPaybackWithFeesAndExpenses: deal.totalPaybackWithFeesAndExpenses != null ? formatDollar(deal.totalPaybackWithFeesAndExpenses.toFixed(2)) : "",
+            netProfit: deal.netProfit != null ? formatDollar(deal.netProfit.toFixed(2)) : "",
             rolledBalance: deal.rolledBalance != null ? formatDollar(deal.rolledBalance.toFixed(2)) : "",
             netNewCashOut: deal.netNewCashOut != null ? formatDollar(deal.netNewCashOut.toFixed(2)) : "",
             roi: deal.roi?.toFixed(2) ?? "",
@@ -273,6 +282,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             miscellaneousExpenses: formData.miscellaneousExpenses ? parseFloat(stripCommas(formData.miscellaneousExpenses)) : null,
             discount: formData.discount ? parseFloat(stripCommas(formData.discount)) : null,
             amountPaidIn: formData.amountPaidIn ? parseFloat(stripCommas(formData.amountPaidIn)) : null,
+            totalCashOut: formData.totalCashOut ? parseFloat(stripCommas(formData.totalCashOut)) : null,
+            totalPaybackWithFeesAndExpenses: formData.totalPaybackWithFeesAndExpenses ? parseFloat(stripCommas(formData.totalPaybackWithFeesAndExpenses)) : null,
+            netProfit: formData.netProfit ? parseFloat(stripCommas(formData.netProfit)) : null,
             rolledBalance: formData.rolledBalance ? parseFloat(stripCommas(formData.rolledBalance)) : null,
             netNewCashOut: formData.netNewCashOut ? parseFloat(stripCommas(formData.netNewCashOut)) : null,
             roi: formData.roi ? parseFloat(formData.roi) : null,
@@ -630,13 +642,6 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     }}
                 />
             </div>
-            <div className="form-row" title="Calculated: Funded Amount x Factor Rate">
-                <label>Total Payback</label>
-                <div className="input-prefixed">
-                    <span className="input-prefix-symbol">$</span>
-                    <input type="text" value={formatDollar(formData.totalPaybackAmount)} disabled />
-                </div>
-            </div>
             <div className="form-row" title="Calculated: Weekly = Total Payback / (Term / 5), Daily = Total Payback / Term">
                 <label>Payment Amount</label>
                 <div className="input-prefixed">
@@ -644,8 +649,63 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     <input type="text" value={formatDollar(formData.paymentAmount)} disabled />
                 </div>
             </div>
+            <div className="form-row" title="Calculated: Funded Amount x Factor Rate">
+                <label>Total Payback</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input type="text" value={formatDollar(formData.totalPaybackAmount)} disabled />
+                </div>
+            </div>
 
-            {/* Row 5: Misc Fees | Misc Expenses | Discount | ROI */}
+            {/* Row 5: Total Cash Out | Total Payback w/ Fees & Expenses | Net Profit | (empty) */}
+            <div className="form-row" title="Calculated: Net Funded Amount + Broker Commission + Miscellaneous Expenses">
+                <label>Total Cash Out</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input type="text" value={(() => {
+                        const net = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
+                        const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
+                        const misc = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
+                        const total = net + comm + misc;
+                        return total > 0 ? formatDollar(total.toFixed(2)) : "";
+                    })()} disabled />
+                </div>
+            </div>
+            <div className="form-row" title="Calculated: Total Payback + Miscellaneous Fees + Miscellaneous Expenses - Discount">
+                <label>Total Payback w/ Fees &amp; Expenses</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input type="text" value={(() => {
+                        const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
+                        const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
+                        const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
+                        const disc = parseFloat(stripCommas(formData.discount)) || 0;
+                        const total = payback + fees + expenses - disc;
+                        return total > 0 ? formatDollar(total.toFixed(2)) : "";
+                    })()} disabled />
+                </div>
+            </div>
+            <div className="form-row" title="Net profit from this deal after all costs and expenses">
+                <label>Net Profit</label>
+                <div className="input-prefixed">
+                    <span className="input-prefix-symbol">$</span>
+                    <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formData.netProfit}
+                        onFocus={() => setFormData(f => ({ ...f, netProfit: stripCommas(f.netProfit) }))}
+                        onChange={(e) => setFormData({ ...formData, netProfit: stripCommas(e.target.value) })}
+                        onBlur={(e) => {
+                            const v = parseFloat(stripCommas(e.target.value));
+                            if (!isNaN(v)) setFormData((f) => ({ ...f, netProfit: formatDollar(v.toFixed(2)) }));
+                        }}
+                    />
+                </div>
+            </div>
+            <div />
+
+            {/* Row 6: Misc Fees | Misc Expenses | Discount | (empty) */}
             <div className="form-row" title="Any additional miscellaneous fees applied to this deal">
                 <label>Miscellaneous Fees</label>
                 <div className="input-prefixed">
