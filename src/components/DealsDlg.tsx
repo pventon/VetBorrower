@@ -763,21 +763,19 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             <div />
 
             {/* Row 6: Outstanding Amount Owed | Amount Paid In | Expected ROI | Current ROI */}
-            <div className="form-row" title="Calculated: Total Payback minus payments made from Funded Date to today. Stops calculating if deal is renewed or defaulted">
+            <div className="form-row" title="Calculated: Total Payback w/ Fees & Expenses - Amount Paid In">
                 <label>Outstanding Amount Owed</label>
                 <div className="input-prefixed">
                     <span className="input-prefix-symbol">$</span>
                     <input type="text" value={(() => {
-                        // Don't calculate if deal has been renewed or defaulted
-                        if (editingDeal?.renewalDealId || formData.hasDefaulted) return "";
-                        if (!formData.fundedDate || !formData.totalPaybackAmount || !formData.paymentAmount) return "";
-                        const today = new Date().toISOString().split("T")[0];
-                        const days = Math.floor((parseDateUTC(today) - parseDateUTC(formData.fundedDate)) / 86400000);
-                        if (days <= 0) return "";
-                        const weekly = formData.weeklyOrDailyPayment === "true";
-                        const paymentsMade = weekly ? Math.floor(days / 5) : days;
-                        const owed = parseFloat(stripCommas(formData.totalPaybackAmount)) - paymentsMade * parseFloat(stripCommas(formData.paymentAmount));
-                        return formatDollar((owed > 0 ? owed : 0).toFixed(2));
+                        const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
+                        const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
+                        const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
+                        const disc = parseFloat(stripCommas(formData.discount)) || 0;
+                        const totalWithFees = payback + fees + expenses - disc;
+                        const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
+                        const owed = totalWithFees - paidIn;
+                        return totalWithFees > 0 ? formatDollar((owed > 0 ? owed : 0).toFixed(2)) : "";
                     })()} disabled />
                 </div>
             </div>
