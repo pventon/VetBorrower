@@ -43,8 +43,10 @@ export default function ComboBox({ value, options, onChange, placeholder, style,
     const [filter, setFilter] = useState("");
     const [isFocused, setIsFocused] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
+    const [highlightIndex, setHighlightIndex] = useState(-1);
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     const checkDropDirection = () => {
         if (!containerRef.current) return;
@@ -71,9 +73,55 @@ export default function ComboBox({ value, options, onChange, placeholder, style,
     const itemHeight = 30; // approx height per item in px
     const dropdownMaxHeight = maxVisible ? maxVisible * itemHeight : 160;
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (!isOpen) {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                checkDropDirection();
+                setIsOpen(true);
+                setHighlightIndex(0);
+            }
+            return;
+        }
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setHighlightIndex(prev => {
+                const next = prev < filtered.length - 1 ? prev + 1 : 0;
+                scrollItemIntoView(next);
+                return next;
+            });
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setHighlightIndex(prev => {
+                const next = prev > 0 ? prev - 1 : filtered.length - 1;
+                scrollItemIntoView(next);
+                return next;
+            });
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (highlightIndex >= 0 && highlightIndex < filtered.length) {
+                handleSelect(filtered[highlightIndex]);
+            }
+        } else if (e.key === "Escape") {
+            setIsOpen(false);
+            setFilter("");
+        }
+    };
+
+    const scrollItemIntoView = (index: number) => {
+        requestAnimationFrame(() => {
+            if (!dropdownRef.current) return;
+            const items = dropdownRef.current.children;
+            if (items[index]) {
+                (items[index] as HTMLElement).scrollIntoView({ block: "nearest" });
+            }
+        });
+    };
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setFilter(val);
+        setHighlightIndex(0);
         if (strictMode) {
             // Only update value if it matches an option exactly
             const match = normalizedOptions.find(o => o.label.toLowerCase() === val.toLowerCase());
@@ -128,6 +176,7 @@ export default function ComboBox({ value, options, onChange, placeholder, style,
                     type="text"
                     value={isOpen ? (filter || displayValue) : displayValue}
                     onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
                     onFocus={() => { setIsFocused(true); handleInputFocus(); }}
                     onBlur={() => {
                         setIsFocused(false);
@@ -176,20 +225,20 @@ export default function ComboBox({ value, options, onChange, placeholder, style,
                     background: "#fff",
                     zIndex: 9999,
                 }}>
+                    <div ref={dropdownRef}>
                     {filtered.length > 0 ? (
-                        filtered.map((opt) => (
+                        filtered.map((opt, idx) => (
                             <div
                                 key={opt.value}
                                 onClick={() => handleSelect(opt)}
+                                onMouseEnter={() => setHighlightIndex(idx)}
                                 style={{
                                     padding: "0.35rem 0.5rem",
                                     cursor: "pointer",
                                     fontSize: "inherit",
                                     borderBottom: "1px solid #f0f0f0",
-                                    backgroundColor: opt.value === value ? "#e3f2fd" : undefined,
+                                    backgroundColor: idx === highlightIndex ? "#d0e4f7" : opt.value === value ? "#e3f2fd" : undefined,
                                 }}
-                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#e3f2fd")}
-                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = opt.value === value ? "#e3f2fd" : "")}
                             >
                                 {opt.label}
                             </div>
@@ -199,6 +248,7 @@ export default function ComboBox({ value, options, onChange, placeholder, style,
                             {strictMode ? "No matching options" : value ? `"${value}" will be added as new` : "No options found"}
                         </div>
                     )}
+                    </div>
                 </div>
             )}
         </div>

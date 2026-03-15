@@ -53,11 +53,13 @@ const dealSchema = new mongoose.Schema({
   miscellaneousExpenses: Number,
   discount: Number,
   amountPaidIn: Number,
+  settledByRenewal: Number,
   totalCashOut: Number,
   totalPaybackWithFeesAndExpenses: Number,
   netProfit: Number,
 
   // Renewal-specific fields
+  renewalDate: Date,
   rolledBalance: Number,
   netNewCashOut: Number,
 
@@ -67,6 +69,18 @@ const dealSchema = new mongoose.Schema({
 
   // Deal state: dormant | active | completed | default | renewal
   dealState: { type: String, default: 'dormant' },
+
+  // Compound performance (calculated across renewal chain)
+  compoundTotalFunded: Number,
+  compoundTotalPayback: Number,
+  compoundTotalCollected: Number,
+  compoundNetNewCapital: Number,
+  compoundExpectedProfit: Number,
+  compoundCurrentProfit: Number,
+  compoundExpectedRoi: Number,
+  compoundExpectedRoiOnCapital: Number,
+  compoundCurrentRoi: Number,
+  compoundCurrentRoiOnCapital: Number,
 
   // Open positions
   positions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Positions' }],

@@ -50,13 +50,25 @@ export interface DealRecord {
   miscellaneousExpenses: number;
   discount: number;
   amountPaidIn: number;
+  settledByRenewal: number;
   totalCashOut: number;
   totalPaybackWithFeesAndExpenses: number;
   netProfit: number;
+  renewalDate: string;
   rolledBalance: number;
   netNewCashOut: number;
   roi: number;
   currentRoi: number;
+  compoundTotalFunded: number;
+  compoundTotalPayback: number;
+  compoundTotalCollected: number;
+  compoundNetNewCapital: number;
+  compoundExpectedProfit: number;
+  compoundCurrentProfit: number;
+  compoundExpectedRoi: number;
+  compoundExpectedRoiOnCapital: number;
+  compoundCurrentRoi: number;
+  compoundCurrentRoiOnCapital: number;
   positions: string[];
   dealState: string;              // "dormant" | "active" | "completed" | "default" | "renewal"
   renewalDealId: string | null;    // ID of the renewal deal created from this deal

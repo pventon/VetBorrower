@@ -60,9 +60,11 @@ interface DealFormData {
     miscellaneousExpenses: string;
     discount: string;
     amountPaidIn: string;
+    settledByRenewal: string;
     totalCashOut: string;
     totalPaybackWithFeesAndExpenses: string;
     netProfit: string;
+    renewalDate: string;
     rolledBalance: string;
     netNewCashOut: string;
     roi: string;
@@ -98,9 +100,11 @@ const emptyForm: DealFormData = {
     miscellaneousExpenses: "",
     discount: "",
     amountPaidIn: "",
+    settledByRenewal: "",
     totalCashOut: "",
     totalPaybackWithFeesAndExpenses: "",
     netProfit: "",
+    renewalDate: "",
     rolledBalance: "",
     netNewCashOut: "",
     roi: "",
@@ -157,6 +161,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const [isAddingPosition, setIsAddingPosition] = useState(false);
     const [editingPositionId, setEditingPositionId] = useState<string | null>(null);
     const [positionForm, setPositionForm] = useState({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true });
+    const [showCompoundInfo, setShowCompoundInfo] = useState(false);
 
     const headers = {
         "Content-Type": "application/json",
@@ -261,22 +266,25 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             miscellaneousExpenses: deal.miscellaneousExpenses != null ? formatDollar(deal.miscellaneousExpenses.toFixed(2)) : "",
             discount: deal.discount != null ? formatDollar(deal.discount.toFixed(2)) : "",
             amountPaidIn: deal.amountPaidIn != null ? formatDollar(deal.amountPaidIn.toFixed(2)) : "",
+            settledByRenewal: deal.settledByRenewal != null ? formatDollar(deal.settledByRenewal.toFixed(2)) : "",
             totalCashOut: deal.totalCashOut != null ? formatDollar(deal.totalCashOut.toFixed(2)) : "",
             totalPaybackWithFeesAndExpenses: deal.totalPaybackWithFeesAndExpenses != null ? formatDollar(deal.totalPaybackWithFeesAndExpenses.toFixed(2)) : "",
             netProfit: deal.netProfit != null ? formatDollar(deal.netProfit.toFixed(2)) : "",
+            renewalDate: toDateInput(deal.renewalDate),
             rolledBalance: (() => {
                 if (deal.rolledBalance) return formatDollar(deal.rolledBalance.toFixed(2));
                 // For renewals with no value, calculate from parent's Outstanding Amount Owed
                 if (deal.parentDealId) {
                     const parent = deals.find(d => d._id === deal.parentDealId);
                     if (parent) {
-                        const payback = parent.totalPaybackAmount || 0;
+                        const payback = parent.totalPaybackAmount || ((parent.fundedAmount || 0) * (parent.factorRate || 0));
                         const fees = parent.miscellaneousFees || 0;
                         const expenses = parent.miscellaneousExpenses || 0;
                         const disc = parent.discount || 0;
                         const totalWithFees = payback + fees + expenses - disc;
                         const paidIn = parent.amountPaidIn || 0;
-                        const outstanding = totalWithFees - paidIn;
+                        const settled = parent.settledByRenewal || 0;
+                        const outstanding = totalWithFees - paidIn - settled;
                         if (outstanding > 0) return formatDollar(outstanding.toFixed(2));
                     }
                 }
@@ -376,6 +384,16 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         return titleCased;
     };
 
+    const calcDealTotalPaybackWithFees = (d: DealRecord): number => {
+        const payback = (d.fundedAmount || 0) * (d.factorRate || 0);
+        return payback + (d.miscellaneousFees || 0) + (d.miscellaneousExpenses || 0) - (d.discount || 0);
+    };
+
+    const calcDealNetNewCapital = (d: DealRecord): number => {
+        if (!d.parentDealId) return d.fundedAmount || 0; // Root deal = full funded amount
+        return (d.fundedAmount || 0) - (d.rolledBalance || 0); // Renewal = funded minus rolled balance
+    };
+
     const startEditPosition = (pos: PositionRecord) => {
         setEditingPositionId(pos._id);
         setPositionForm({
@@ -463,13 +481,16 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             miscellaneousExpenses: formData.miscellaneousExpenses ? parseFloat(stripCommas(formData.miscellaneousExpenses)) : null,
             discount: formData.discount ? parseFloat(stripCommas(formData.discount)) : null,
             amountPaidIn: formData.amountPaidIn ? parseFloat(stripCommas(formData.amountPaidIn)) : null,
+            settledByRenewal: formData.settledByRenewal ? parseFloat(stripCommas(formData.settledByRenewal)) : null,
             totalCashOut: formData.totalCashOut ? parseFloat(stripCommas(formData.totalCashOut)) : null,
             totalPaybackWithFeesAndExpenses: formData.totalPaybackWithFeesAndExpenses ? parseFloat(stripCommas(formData.totalPaybackWithFeesAndExpenses)) : null,
             netProfit: formData.netProfit ? parseFloat(stripCommas(formData.netProfit)) : null,
+            renewalDate: formData.renewalDate || null,
             rolledBalance: formData.rolledBalance ? parseFloat(stripCommas(formData.rolledBalance)) : null,
             netNewCashOut: formData.netNewCashOut ? parseFloat(stripCommas(formData.netNewCashOut)) : null,
             roi: formData.roi ? parseFloat(formData.roi) : null,
             currentRoi: formData.currentRoi ? parseFloat(formData.currentRoi) : null,
+            // Compound values will be recalculated after save when the chain is refreshed
         };
 
         try {
@@ -490,7 +511,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     await fetch(`${API_BASE}/api/deal/${renewingParentId}`, {
                         method: "PUT",
                         headers,
-                        body: JSON.stringify({ renewalDealId: resData._id }),
+                        body: JSON.stringify({
+                            renewalDealId: resData._id,
+                            settledByRenewal: formData.rolledBalance ? parseFloat(stripCommas(formData.rolledBalance)) : 0,
+                            renewalDate: new Date().toISOString().split("T")[0],
+                            dealState: "renewed",
+                        }),
                     });
                 }
                 // Save any pending local positions to the new deal
@@ -519,9 +545,67 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             }
             cancelForm();
             await fetchDeals(selectedCorpId);
+            // Recalculate compound values for all deals in any renewal chains
+            await recalcCompoundForAllChains();
         } catch (err) {
             setFormError(err instanceof Error ? err.message : "Operation failed");
         }
+    };
+
+    const recalcCompoundForAllChains = async () => {
+        // Re-fetch latest deals
+        const res = await fetch(`${API_BASE}/api/deal?corporationId=${selectedCorpId}`, { headers });
+        if (!res.ok) return;
+        const latestDeals: DealRecord[] = await res.json();
+        setDeals(latestDeals);
+
+        // Find all root deals that have renewals
+        const roots = latestDeals.filter(d => !d.parentDealId && d.renewalDealId);
+        for (const root of roots) {
+            // Build chain
+            const chain: DealRecord[] = [root];
+            let current = root;
+            while (current.renewalDealId) {
+                const next = latestDeals.find(d => d._id === current.renewalDealId);
+                if (!next) break;
+                chain.push(next);
+                current = next;
+            }
+            if (chain.length < 2) continue;
+
+            const totalFunded = chain.reduce((s, d) => s + (d.fundedAmount || 0), 0);
+            const totalPayback = chain.reduce((s, d) => {
+                const pb = (d.fundedAmount || 0) * (d.factorRate || 0);
+                return s + pb + (d.miscellaneousFees || 0) + (d.miscellaneousExpenses || 0) - (d.discount || 0);
+            }, 0);
+            const totalCollected = chain.reduce((s, d) => s + (d.amountPaidIn || 0) + (d.settledByRenewal || 0), 0);
+            const netNewCap = chain.reduce((s, d) => s + (!d.parentDealId ? (d.fundedAmount || 0) : (d.fundedAmount || 0) - (d.rolledBalance || 0)), 0);
+            const expectedProfit = totalPayback - totalFunded;
+            const currentProfit = totalCollected - totalFunded;
+
+            const compoundData = {
+                compoundTotalFunded: totalFunded,
+                compoundTotalPayback: totalPayback,
+                compoundTotalCollected: totalCollected,
+                compoundNetNewCapital: netNewCap,
+                compoundExpectedProfit: expectedProfit,
+                compoundCurrentProfit: currentProfit,
+                compoundExpectedRoi: totalFunded > 0 ? parseFloat((expectedProfit / totalFunded * 100).toFixed(2)) : null,
+                compoundExpectedRoiOnCapital: netNewCap > 0 ? parseFloat((expectedProfit / netNewCap * 100).toFixed(2)) : null,
+                compoundCurrentRoi: totalFunded > 0 ? parseFloat((currentProfit / totalFunded * 100).toFixed(2)) : null,
+                compoundCurrentRoiOnCapital: netNewCap > 0 ? parseFloat((currentProfit / netNewCap * 100).toFixed(2)) : null,
+            };
+
+            // Update all deals in the chain with compound data
+            for (const d of chain) {
+                await fetch(`${API_BASE}/api/deal/${d._id}`, {
+                    method: "PUT", headers,
+                    body: JSON.stringify(compoundData),
+                });
+            }
+        }
+        // Re-fetch to show updated values
+        await fetchDeals(selectedCorpId);
     };
 
     const handleDelete = async (deal: DealRecord) => {
@@ -557,13 +641,14 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         const today = new Date().toISOString().split("T")[0];
 
         // Calculate Outstanding Amount Owed from parent deal for Rolled Balance
-        const payback = deal.totalPaybackAmount || 0;
+        const payback = deal.totalPaybackAmount || ((deal.fundedAmount || 0) * (deal.factorRate || 0));
         const fees = deal.miscellaneousFees || 0;
         const expenses = deal.miscellaneousExpenses || 0;
         const disc = deal.discount || 0;
         const totalWithFees = payback + fees + expenses - disc;
         const paidIn = deal.amountPaidIn || 0;
-        const outstanding = totalWithFees - paidIn;
+        const settled = deal.settledByRenewal || 0;
+        const outstanding = totalWithFees - paidIn - settled;
 
         setFormData({
             ...emptyForm,
@@ -977,7 +1062,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             {/* Section 5: Performance */}
             <div className="form-section">
                 <div className="form-section-header">Performance</div>
-                <div className="form-grid-5">
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "0 1rem" }}>
                     <div className="form-row" title="Total amount paid in by the borrower to date">
                         <label>Amount Paid In</label>
                         <div className="input-prefixed">
@@ -989,7 +1074,14 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             />
                         </div>
                     </div>
-                    <div className="form-row" title="Calculated: Total Payback w/ Fees & Expenses - Amount Paid In">
+                    <div className="form-row" title="Amount settled by the renewal deal's rolled balance. Auto-populated when a renewal is created">
+                        <label>Settled by Renewal</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" value={formData.settledByRenewal ? formatDollar(formData.settledByRenewal) : ""} disabled />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: Total Payback w/ Fees & Expenses - Amount Paid In - Settled by Renewal">
                         <label>Outstanding Amount Owed</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
@@ -1000,23 +1092,26 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 const disc = parseFloat(stripCommas(formData.discount)) || 0;
                                 const totalWithFees = payback + fees + expenses - disc;
                                 const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
-                                const owed = totalWithFees - paidIn;
+                                const settled = parseFloat(stripCommas(formData.settledByRenewal)) || 0;
+                                const owed = totalWithFees - paidIn - settled;
                                 return totalWithFees > 0 ? formatDollar((owed > 0 ? owed : 0).toFixed(2)) : "";
                             })()} disabled />
                         </div>
                     </div>
-                    <div className="form-row" title="Calculated: Amount Paid In - Total Cash Out">
+                    <div className="form-row" title="Calculated: (Amount Paid In + Settled by Renewal) - Total Cash Out">
                         <label>Net Profit</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
                             <input type="text" value={(() => {
                                 const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
+                                const settled = parseFloat(stripCommas(formData.settledByRenewal)) || 0;
                                 const net = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
                                 const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
                                 const misc = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
                                 const totalCashOut = net + comm + misc;
-                                if (paidIn <= 0 && totalCashOut <= 0) return "";
-                                return formatDollar((paidIn - totalCashOut).toFixed(2));
+                                const totalReceived = paidIn + settled;
+                                if (totalReceived <= 0 && totalCashOut <= 0) return "";
+                                return formatDollar((totalReceived - totalCashOut).toFixed(2));
                             })()} disabled />
                         </div>
                     </div>
@@ -1038,12 +1133,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             })()} disabled />
                         </div>
                     </div>
-                    <div className="form-row" title="Calculated: (Amount Paid In - Total Cash Out) / Total Cash Out x 100">
+                    <div className="form-row" title="Calculated: ((Amount Paid In + Settled by Renewal) - Total Cash Out) / Total Cash Out x 100">
                         <label>Current ROI</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">%</span>
                             <input type="text" value={(() => {
-                                const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
+                                const paidIn = (parseFloat(stripCommas(formData.amountPaidIn)) || 0) + (parseFloat(stripCommas(formData.settledByRenewal)) || 0);
                                 const netFunded = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
                                 const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
                                 const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
@@ -1122,39 +1217,248 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 </div>
             </div>
 
-            {/* Section 7: Renewal (only shown for renewals) */}
-            {formData.typeOfDeal === "renewal" && (
-                <div className="form-section">
-                    <div className="form-section-header">Renewal</div>
-                    <div className="form-grid-3">
-                        <div className="form-row" title="Balance rolled over from the previous deal into this renewal">
-                            <label>Rolled Balance</label>
-                            <div className="input-prefixed">
-                                <span className="input-prefix-symbol">$</span>
-                                <input type="text" inputMode="decimal" placeholder="0.00" value={formData.rolledBalance}
-                                    onFocus={() => setFormData(f => ({ ...f, rolledBalance: stripCommas(f.rolledBalance) }))}
-                                    onChange={(e) => setFormData({ ...formData, rolledBalance: stripCommas(e.target.value) })}
-                                    onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, rolledBalance: formatDollar(v.toFixed(2)) })); }}
-                                />
-                            </div>
-                        </div>
-                        <div className="form-row" title="New cash disbursed to the client as part of this renewal, excluding the rolled balance">
-                            <label>Net New Cash Out</label>
-                            <div className="input-prefixed">
-                                <span className="input-prefix-symbol">$</span>
-                                <input type="text" inputMode="decimal" placeholder="0.00" value={formData.netNewCashOut}
-                                    onFocus={() => setFormData(f => ({ ...f, netNewCashOut: stripCommas(f.netNewCashOut) }))}
-                                    onChange={(e) => setFormData({ ...formData, netNewCashOut: stripCommas(e.target.value) })}
-                                    onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, netNewCashOut: formatDollar(v.toFixed(2)) })); }}
-                                />
-                            </div>
-                        </div>
-                        <div />
+            {/* Section 7: Renewal */}
+            <div className="form-section">
+                <div className="form-section-header">Renewal</div>
+                <div className="form-grid-3">
+                    <div className="form-row" title="Date this deal was renewed. Auto-populated when a renewal is saved">
+                        <label>Renewal Date</label>
+                        <input type="date" value={formData.renewalDate} disabled />
                     </div>
+                    {formData.typeOfDeal === "renewal" ? (
+                        <>
+                            <div className="form-row" title="Balance rolled over from the previous deal into this renewal">
+                                <label>Rolled Balance</label>
+                                <div className="input-prefixed">
+                                    <span className="input-prefix-symbol">$</span>
+                                    <input type="text" inputMode="decimal" placeholder="0.00" value={formData.rolledBalance}
+                                        onFocus={() => setFormData(f => ({ ...f, rolledBalance: stripCommas(f.rolledBalance) }))}
+                                        onChange={(e) => setFormData({ ...formData, rolledBalance: stripCommas(e.target.value) })}
+                                        onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, rolledBalance: formatDollar(v.toFixed(2)) })); }}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-row" title="Calculated: Funded Amount - Rolled Balance. The actual new cash disbursed to the client">
+                                <label>Net New Cash Out</label>
+                                <div className="input-prefixed">
+                                    <span className="input-prefix-symbol">$</span>
+                                    <input type="text" value={(() => {
+                                        const funded = parseFloat(stripCommas(formData.fundedAmount)) || 0;
+                                        const rolled = parseFloat(stripCommas(formData.rolledBalance)) || 0;
+                                        const netNew = funded - rolled;
+                                        return funded > 0 ? formatDollar((netNew > 0 ? netNew : 0).toFixed(2)) : "";
+                                    })()} disabled />
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div />
+                            <div />
+                        </>
+                    )}
                 </div>
-            )}
+            </div>
 
-            {/* Section 8: Open Positions */}
+            {/* Section 8: Compound Performance (shown when deal is part of a renewal chain or adding a renewal) */}
+            {(() => {
+                // Determine if we should show this section
+                const isPartOfChain = editingDeal && (editingDeal.parentDealId || editingDeal.renewalDealId);
+                const isNewRenewal = isAdding && renewingParentId;
+                if (!isPartOfChain && !isNewRenewal) return null;
+
+                // Build a virtual deal from formData for real-time updates
+                const currentDealFromForm: DealRecord = {
+                    _id: editingDeal?._id ?? "current",
+                    entityId: editingDeal?.entityId ?? "(new)",
+                    officeAcronym: "",
+                    broker: null,
+                    typeOfDeal: formData.typeOfDeal,
+                    position: formData.position,
+                    fundedDate: formData.fundedDate,
+                    defaultDate: formData.defaultDate,
+                    defaultDays: parseInt(formData.defaultDays) || 0,
+                    fundedAmount: parseFloat(stripCommas(formData.fundedAmount)) || 0,
+                    netFundedAmount: parseFloat(stripCommas(formData.netFundedAmount)) || 0,
+                    originationFee: parseFloat(stripCommas(formData.originationFee)) || 0,
+                    originationFeePercent: parseFloat(formData.originationFeePercent) || 0,
+                    loanTerm: parseInt(formData.loanTerm) || 0,
+                    weeklyOrDailyPayment: formData.weeklyOrDailyPayment === "true",
+                    paymentAmount: parseFloat(stripCommas(formData.paymentAmount)) || 0,
+                    buyRate: parseFloat(formData.buyRate) || 0,
+                    factorRate: parseFloat(formData.factorRate) || 0,
+                    mcaHistory: formData.mcaHistory,
+                    brokerFee: parseFloat(formData.brokerFee) || 0,
+                    brokerCommission: parseFloat(stripCommas(formData.brokerCommission)) || 0,
+                    totalPaybackAmount: parseFloat(stripCommas(formData.totalPaybackAmount)) || 0,
+                    hasDefaulted: formData.hasDefaulted,
+                    amountOwedAsOfDefault: parseFloat(stripCommas(formData.amountOwedAsOfDefault)) || 0,
+                    miscellaneousFees: parseFloat(stripCommas(formData.miscellaneousFees)) || 0,
+                    miscellaneousExpenses: parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0,
+                    discount: parseFloat(stripCommas(formData.discount)) || 0,
+                    amountPaidIn: parseFloat(stripCommas(formData.amountPaidIn)) || 0,
+                    settledByRenewal: parseFloat(stripCommas(formData.settledByRenewal)) || 0,
+                    totalCashOut: 0, totalPaybackWithFeesAndExpenses: 0, netProfit: 0,
+                    rolledBalance: parseFloat(stripCommas(formData.rolledBalance)) || 0,
+                    netNewCashOut: parseFloat(stripCommas(formData.netNewCashOut)) || 0,
+                    roi: parseFloat(formData.roi) || 0, currentRoi: parseFloat(formData.currentRoi) || 0,
+                    grossMonthlyRevenue: parseFloat(stripCommas(formData.grossMonthlyRevenue)) || 0,
+                    existingMonthlyPayment: 0, existingMonthlyPaymentPercent: 0,
+                    monthlyPayment: 0, monthlyPaymentPercent: 0,
+                    newMonthlyPayment: 0, newMonthlyPaymentPercent: 0,
+                    compoundTotalFunded: 0, compoundTotalPayback: 0, compoundTotalCollected: 0,
+                    compoundNetNewCapital: 0, compoundExpectedProfit: 0, compoundCurrentProfit: 0,
+                    compoundExpectedRoi: 0, compoundExpectedRoiOnCapital: 0,
+                    compoundCurrentRoi: 0, compoundCurrentRoiOnCapital: 0,
+                    positions: [], dealState: "active",
+                    renewalDate: formData.renewalDate || "",
+                    renewalDealId: editingDeal?.renewalDealId ?? null,
+                    parentDealId: editingDeal?.parentDealId ?? renewingParentId,
+                } as DealRecord;
+
+                // Build chain: walk up to root from parent, then append current
+                let chain: DealRecord[] = [];
+                const parentId = editingDeal?.parentDealId ?? renewingParentId;
+                if (parentId) {
+                    // Find root by walking up
+                    let root = deals.find(d => d._id === parentId);
+                    if (root) {
+                        const ancestors: DealRecord[] = [root];
+                        while (root.parentDealId) {
+                            const p = deals.find(d => d._id === root!.parentDealId);
+                            if (!p) break;
+                            ancestors.unshift(p);
+                            root = p;
+                        }
+                        chain = [...ancestors];
+                    }
+                } else if (editingDeal) {
+                    // This is the root deal — start chain with saved deals before it
+                    chain = [];
+                }
+
+                // For editing, replace the current deal in the chain with the live formData version
+                if (editingDeal) {
+                    chain = chain.filter(d => d._id !== editingDeal._id);
+                    // Also add any renewals after the current deal
+                    let nextId = editingDeal.renewalDealId;
+                    const after: DealRecord[] = [];
+                    while (nextId) {
+                        const next = deals.find(d => d._id === nextId);
+                        if (!next) break;
+                        after.push(next);
+                        nextId = next.renewalDealId;
+                    }
+                    // Insert current deal at the right position
+                    chain.push(currentDealFromForm);
+                    chain.push(...after);
+                } else {
+                    // Adding new renewal — append virtual deal
+                    chain.push(currentDealFromForm);
+                }
+
+                if (chain.length < 2) return null;
+
+                const compoundTotalFunded = chain.reduce((s, d) => s + (d.fundedAmount || 0), 0);
+                const compoundTotalPayback = chain.reduce((s, d) => s + calcDealTotalPaybackWithFees(d), 0);
+                const compoundTotalCollected = chain.reduce((s, d) => s + (d.amountPaidIn || 0) + (d.settledByRenewal || 0), 0);
+                const compoundNetNewCapital = chain.reduce((s, d) => s + calcDealNetNewCapital(d), 0);
+                const compoundExpectedProfit = compoundTotalPayback - compoundTotalFunded;
+                const compoundCurrentProfit = compoundTotalCollected - compoundTotalFunded;
+                const compoundExpectedRoi = compoundTotalFunded > 0 ? (compoundExpectedProfit / compoundTotalFunded * 100) : 0;
+                const compoundExpectedRoiOnCapital = compoundNetNewCapital > 0 ? (compoundExpectedProfit / compoundNetNewCapital * 100) : 0;
+                const compoundCurrentRoi = compoundTotalFunded > 0 ? (compoundCurrentProfit / compoundTotalFunded * 100) : 0;
+                const compoundCurrentRoiOnCapital = compoundNetNewCapital > 0 ? (compoundCurrentProfit / compoundNetNewCapital * 100) : 0;
+
+                const currentId = editingDeal?._id ?? "current";
+
+                return (
+                    <div className="form-section">
+                        <div className="form-section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span>Compound Performance ({chain.length} Deals in Chain)</span>
+                            <button className="btn btn-sm" onClick={() => setShowCompoundInfo(true)} style={{ textTransform: "none", letterSpacing: "normal", fontSize: "0.75rem" }}>Info</button>
+                        </div>
+                        <table className="ledger-table">
+                            <thead>
+                                <tr>
+                                    <th style={{ textAlign: "left" }}>Deal</th>
+                                    <th>Type</th>
+                                    <th>Funded</th>
+                                    <th>Rolled Balance</th>
+                                    <th>Net New Capital</th>
+                                    <th>Total Payback</th>
+                                    <th>Paid In</th>
+                                    <th>Profit</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {chain.map((d) => {
+                                    const totalPB = calcDealTotalPaybackWithFees(d);
+                                    const netNew = calcDealNetNewCapital(d);
+                                    const totalReceived = (d.amountPaidIn || 0) + (d.settledByRenewal || 0);
+                                    const profit = totalReceived - (d.fundedAmount || 0);
+                                    const isCurrent = d._id === currentId;
+                                    return (
+                                        <tr key={d._id} className={isCurrent ? "ledger-current" : ""}>
+                                            <td style={{ textAlign: "left" }}>{d.entityId ?? "-"}</td>
+                                            <td style={{ textTransform: "capitalize" }}>{d.typeOfDeal ?? "-"}</td>
+                                            <td>{formatCurrency(d.fundedAmount)}</td>
+                                            <td>{d.rolledBalance ? formatCurrency(d.rolledBalance) : "-"}</td>
+                                            <td>{formatCurrency(netNew)}</td>
+                                            <td>{formatCurrency(totalPB)}</td>
+                                            <td>{formatCurrency(totalReceived)}</td>
+                                            <td style={{ color: profit >= 0 ? "#2e7d32" : "#c62828" }}>{formatCurrency(profit)}</td>
+                                            <td style={{ textTransform: "capitalize" }}>{d.dealState ?? "-"}</td>
+                                        </tr>
+                                    );
+                                })}
+                                <tr className="ledger-totals">
+                                    <td style={{ textAlign: "left" }}>Totals</td>
+                                    <td></td>
+                                    <td>{formatCurrency(compoundTotalFunded)}</td>
+                                    <td></td>
+                                    <td>{formatCurrency(compoundNetNewCapital)}</td>
+                                    <td>{formatCurrency(compoundTotalPayback)}</td>
+                                    <td>{formatCurrency(compoundTotalCollected)}</td>
+                                    <td style={{ color: compoundCurrentProfit >= 0 ? "#2e7d32" : "#c62828" }}>{formatCurrency(compoundCurrentProfit)}</td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div className="compound-metrics">
+                            <div className="compound-metric-card">
+                                <div className="metric-label">Expected ROI (on Funded)</div>
+                                <div className={`metric-value ${compoundExpectedRoi >= 0 ? "positive" : "negative"}`}>{compoundExpectedRoi.toFixed(2)}%</div>
+                            </div>
+                            <div className="compound-metric-card">
+                                <div className="metric-label">Expected ROI (on Net Capital)</div>
+                                <div className={`metric-value ${compoundExpectedRoiOnCapital >= 0 ? "positive" : "negative"}`}>{compoundExpectedRoiOnCapital.toFixed(2)}%</div>
+                            </div>
+                            <div className="compound-metric-card">
+                                <div className="metric-label">Current ROI (on Funded)</div>
+                                <div className={`metric-value ${compoundCurrentRoi >= 0 ? "positive" : "negative"}`}>{compoundCurrentRoi.toFixed(2)}%</div>
+                            </div>
+                            <div className="compound-metric-card">
+                                <div className="metric-label">Current ROI (on Net Capital)</div>
+                                <div className={`metric-value ${compoundCurrentRoiOnCapital >= 0 ? "positive" : "negative"}`}>{compoundCurrentRoiOnCapital.toFixed(2)}%</div>
+                            </div>
+                        </div>
+                        <div className="compound-metrics" style={{ gridTemplateColumns: "repeat(2, 1fr)", marginTop: "0.25rem" }}>
+                            <div className="compound-metric-card">
+                                <div className="metric-label">Expected Compound Profit</div>
+                                <div className={`metric-value ${compoundExpectedProfit >= 0 ? "positive" : "negative"}`}>{formatCurrency(compoundExpectedProfit)}</div>
+                            </div>
+                            <div className="compound-metric-card">
+                                <div className="metric-label">Current Compound Profit</div>
+                                <div className={`metric-value ${compoundCurrentProfit >= 0 ? "positive" : "negative"}`}>{formatCurrency(compoundCurrentProfit)}</div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* Section 9: Open Positions */}
             <div className="form-section">
                 <div className="form-section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span>Open Positions</span>
@@ -1357,6 +1661,64 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     <div className="dialog-footer">
                         <button className="btn btn-primary" onClick={handleSave}>Save</button>
                         <button className="btn" onClick={cancelForm}>Cancel</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {showCompoundInfo && (
+            <div className="dialog-overlay" style={{ zIndex: 2002 }}>
+                <div className="dialog dialog-wide">
+                    <div className="dialog-header">
+                        <h2>Compound Performance — How It Works</h2>
+                        <button className="dialog-close" onClick={() => setShowCompoundInfo(false)}>&times;</button>
+                    </div>
+                    <div className="dialog-body" style={{ fontSize: "0.88rem", lineHeight: 1.6 }}>
+                        <h3 style={{ color: "#2c3e50", marginBottom: "0.5rem" }}>Overview</h3>
+                        <p>When a deal is renewed, the compound performance section aggregates financial data across the entire renewal chain — from the original deal through every subsequent renewal.</p>
+
+                        <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>The Ledger Table</h3>
+                        <p>Each row represents one deal in the chain, showing:</p>
+                        <ul style={{ marginLeft: "1.5rem", marginBottom: "0.5rem" }}>
+                            <li><strong>Funded</strong> — Total amount funded for that deal</li>
+                            <li><strong>Rolled Balance</strong> — Amount from the renewal used to pay off the previous deal's outstanding balance</li>
+                            <li><strong>Net New Capital</strong> — The actual new money at risk. For the original deal, this equals the full funded amount. For renewals: Funded Amount − Rolled Balance</li>
+                            <li><strong>Total Payback</strong> — Total Payback + Misc Fees + Misc Expenses − Discount</li>
+                            <li><strong>Paid In</strong> — Amount actually received from the borrower</li>
+                            <li><strong>Profit</strong> — Amount Paid In − Funded Amount</li>
+                        </ul>
+
+                        <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Compound Metrics</h3>
+
+                        <p><strong>Expected ROI (on Funded)</strong></p>
+                        <p style={{ marginLeft: "1rem", color: "#555" }}>= (Total Expected Payback − Total Funded) / Total Funded × 100</p>
+                        <p style={{ marginLeft: "1rem", fontSize: "0.82rem", color: "#777" }}>Conservative measure — what percentage return do we expect on the total money we put up?</p>
+
+                        <p style={{ marginTop: "0.5rem" }}><strong>Expected ROI (on Net Capital)</strong></p>
+                        <p style={{ marginLeft: "1rem", color: "#555" }}>= (Total Expected Payback − Total Funded) / Total Net New Capital × 100</p>
+                        <p style={{ marginLeft: "1rem", fontSize: "0.82rem", color: "#777" }}>This is where compounding shows. Each renewal reuses capital via the rolled balance, so the net new capital is lower than the funded amount. This drives the ROI higher with each renewal.</p>
+
+                        <p style={{ marginTop: "0.5rem" }}><strong>Current ROI (on Funded / Net Capital)</strong></p>
+                        <p style={{ marginLeft: "1rem", color: "#555" }}>Same formulas but using actual Amount Paid In instead of expected payback.</p>
+
+                        <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Why ROI Improves With Renewals</h3>
+                        <p>Each renewal funds a new deal, but part of that money (the rolled balance) pays off the previous deal. This means:</p>
+                        <ul style={{ marginLeft: "1.5rem" }}>
+                            <li>The previous deal is fully satisfied (all payback collected)</li>
+                            <li>The new deal only requires (Funded − Rolled Balance) of truly new capital</li>
+                            <li>But the borrower owes the full payback amount on the new funded amount</li>
+                            <li>Result: less new money at risk, same return — higher ROI on net capital</li>
+                        </ul>
+
+                        <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Example</h3>
+                        <p>Deal 1: Fund $10,000 at 1.35 factor. Payback = $13,500. Client pays 50% ($6,750), outstanding = $6,750.</p>
+                        <p>Deal 2 (renewal): Fund $10,000 at 1.35. Rolled Balance = $6,750. Net new capital = $3,250. Payback = $13,500.</p>
+                        <p style={{ marginTop: "0.5rem" }}><strong>Expected ROI on Funded:</strong> ($27,000 − $20,000) / $20,000 = 35%</p>
+                        <p><strong>Expected ROI on Net Capital:</strong> ($27,000 − $20,000) / $13,250 = 52.83%</p>
+                        <p style={{ fontSize: "0.82rem", color: "#777", marginTop: "0.3rem" }}>The ROI on net capital is higher because $6,750 of Deal 2 recycled existing capital rather than requiring new funds.</p>
+                    </div>
+                    <div className="dialog-footer">
+                        <button className="btn" onClick={() => setShowCompoundInfo(false)}>Close</button>
                     </div>
                 </div>
             </div>
