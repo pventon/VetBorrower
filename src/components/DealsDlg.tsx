@@ -401,18 +401,20 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         return payback + (d.miscellaneousFees || 0) + (d.miscellaneousExpenses || 0) - (d.discount || 0);
     };
 
-    const calcDealNetNewCapital = (d: DealRecord): number => {
-        if (!d.parentDealId) return d.fundedAmount || 0; // Root deal = full funded amount
-        return (d.fundedAmount || 0) - (d.rolledBalance || 0); // Renewal = funded minus rolled balance
-    };
-
-    const calcDealTotalNetNewCashOut = (d: DealRecord): number => {
+    // Total money out of the bank for a deal = Net to client + Broker Commission
+    // Root: Net Funded + Commission
+    // Renewal: (Net Funded - Rolled Balance) + Commission
+    const calcDealTotalMoneyOut = (d: DealRecord): number => {
         const netFunded = d.netFundedAmount || ((d.fundedAmount || 0) - (d.originationFee || 0));
         const rolled = d.rolledBalance || 0;
-        const netNewCashOut = d.parentDealId ? Math.max(netFunded - rolled, 0) : netFunded;
+        const netToClient = d.parentDealId ? Math.max(netFunded - rolled, 0) : netFunded;
         const comm = d.brokerCommission || ((d.brokerFee || 0) / 100 * (d.fundedAmount || 0));
-        return netNewCashOut + comm;
+        return netToClient + comm;
     };
+
+    // Alias for clarity in different contexts
+    const calcDealNetNewCapital = calcDealTotalMoneyOut;
+    const calcDealTotalNetNewCashOut = calcDealTotalMoneyOut;
 
     const startEditPosition = (pos: PositionRecord) => {
         setEditingPositionId(pos._id);
@@ -599,7 +601,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 return s + pb + (d.miscellaneousFees || 0) + (d.miscellaneousExpenses || 0) - (d.discount || 0);
             }, 0);
             const totalCollected = chain.reduce((s, d) => s + (d.amountPaidIn || 0), 0);
-            const netNewCap = chain.reduce((s, d) => s + (!d.parentDealId ? (d.fundedAmount || 0) : (d.fundedAmount || 0) - (d.rolledBalance || 0)), 0);
+            const netNewCap = chain.reduce((s, d) => {
+                const netFunded = d.netFundedAmount || ((d.fundedAmount || 0) - (d.originationFee || 0));
+                const netToClient = !d.parentDealId ? netFunded : Math.max(netFunded - (d.rolledBalance || 0), 0);
+                const comm = d.brokerCommission || ((d.brokerFee || 0) / 100 * (d.fundedAmount || 0));
+                return s + netToClient + comm;
+            }, 0);
             const totalNetNewCashOut = chain.reduce((s, d) => {
                 const netFunded = d.netFundedAmount || ((d.fundedAmount || 0) - (d.originationFee || 0));
                 const rolled = d.rolledBalance || 0;
@@ -1448,7 +1455,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     const paidIn = d.amountPaidIn || 0;
                                     const settled = d.settledByRenewal || 0;
                                     const outstanding = totalPB - paidIn;
-                                    const profit = paidIn - (d.fundedAmount || 0);
+                                    const totalMoneyOut = calcDealTotalMoneyOut(d);
+                                    const profit = paidIn - totalMoneyOut;
                                     const isCurrent = d._id === currentId;
                                     return (
                                         <tr key={d._id} className={isCurrent ? "ledger-current" : ""}>
@@ -1467,7 +1475,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     );
                                 })}
                                 {(() => {
-                                    const totalLedgerProfit = chain.reduce((s, d) => s + ((d.amountPaidIn || 0) - (d.fundedAmount || 0)), 0);
+                                    const totalLedgerProfit = chain.reduce((s, d) => s + ((d.amountPaidIn || 0) - calcDealTotalMoneyOut(d)), 0);
                                     const totalRolledBalance = chain.reduce((s, d) => s + (d.rolledBalance || 0), 0);
                                     const totalSettled = chain.reduce((s, d) => s + (d.settledByRenewal || 0), 0);
                                     const totalOutstanding = chain.reduce((s, d) => {
