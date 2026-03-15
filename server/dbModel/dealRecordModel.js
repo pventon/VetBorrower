@@ -18,6 +18,13 @@ import mongoose from 'mongoose';
 const dealSchema = new mongoose.Schema({
     
   entityId: String,               // Auto-assigned: D1000, D1001, ...
+  grossMonthlyRevenue: Number,
+  existingMonthlyPayment: Number,
+  existingMonthlyPaymentPercent: Number,
+  monthlyPayment: Number,
+  monthlyPaymentPercent: Number,
+  newMonthlyPayment: Number,
+  newMonthlyPaymentPercent: Number,
   officeAcronym: String,
   broker: { type: mongoose.Schema.Types.ObjectId, ref: 'Brokers' },
   typeOfDeal: String,             // new/renewal
@@ -60,6 +67,9 @@ const dealSchema = new mongoose.Schema({
 
   // Deal state: dormant | active | completed | default | renewal
   dealState: { type: String, default: 'dormant' },
+
+  // Open positions
+  positions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Positions' }],
 
   // Deal renewal linking
   renewalDealId: { type: mongoose.Schema.Types.ObjectId, ref: 'Deals', default: null },  // Points to the renewal created from this deal

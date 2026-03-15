@@ -25,6 +25,7 @@ import { AddDealToCorporation, RemoveDealFromCorporation } from '../dbAccessFunc
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import { getNextEntityId } from '../dbModel/counterModel.js';
 import { deriveDealState, applyDealState } from '../dbAccessFunctions/dealStateEngine.js';
+import { DeletePosition } from '../dbAccessFunctions/positionRecord.js';
 
 const router = express.Router();
 
@@ -145,6 +146,13 @@ router.delete('/api/deal/:id', authenticateToken, async (req, res) => {
     // If this deal is a renewal, clear the parent's renewalDealId
     if (deal.parentDealId) {
       await UpdateDeal(deal.parentDealId, { renewalDealId: null });
+    }
+
+    // Delete all associated positions
+    if (deal.positions && deal.positions.length > 0) {
+      for (const posId of deal.positions) {
+        await DeletePosition(posId);
+      }
     }
 
     const record = await DeleteDeal(req.params.id);

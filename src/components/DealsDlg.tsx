@@ -18,6 +18,7 @@ import { useAuth } from "../context/AuthContext";
 import type { CorporationRecord } from "../types/corporationRecord";
 import type { DealRecord } from "../types/dealRecord";
 import type { BrokerRecord } from "../types/brokerRecord";
+import type { PositionRecord } from "../types/positionRecord";
 
 const API_BASE =
     import.meta.env.VITE_ENV_IS_TEST_ENV === "true"
@@ -29,6 +30,9 @@ interface DealsDlgProps {
 }
 
 interface DealFormData {
+    grossMonthlyRevenue: string;
+    monthlyPayment: string;
+    monthlyPaymentPercent: string;
     broker: string;
     typeOfDeal: string;
     position: string;
@@ -64,6 +68,9 @@ interface DealFormData {
 }
 
 const emptyForm: DealFormData = {
+    grossMonthlyRevenue: "",
+    monthlyPayment: "",
+    monthlyPaymentPercent: "",
     broker: "",
     typeOfDeal: "new",
     position: "",
@@ -143,6 +150,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const [renewingParentId, setRenewingParentId] = useState<string | null>(null);
     const [formData, setFormData] = useState<DealFormData>(emptyForm);
     const [formError, setFormError] = useState<string | null>(null);
+    const [positions, setPositions] = useState<PositionRecord[]>([]);
+    const [isAddingPosition, setIsAddingPosition] = useState(false);
+    const [editingPositionId, setEditingPositionId] = useState<string | null>(null);
+    const [positionForm, setPositionForm] = useState({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true });
 
     const headers = {
         "Content-Type": "application/json",
@@ -196,6 +207,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         setIsAdding(false);
         setEditingDeal(deal);
         setFormData({
+            grossMonthlyRevenue: deal.grossMonthlyRevenue != null ? formatDollar(deal.grossMonthlyRevenue.toFixed(2)) : "",
+            monthlyPayment: deal.monthlyPayment != null ? formatDollar(deal.monthlyPayment.toFixed(2)) : "",
+            monthlyPaymentPercent: deal.monthlyPaymentPercent?.toFixed(2) ?? "",
             broker: deal.broker?._id ?? "",
             typeOfDeal: deal.typeOfDeal ?? "new",
             position: deal.position ?? "",
@@ -242,6 +256,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             currentRoi: deal.currentRoi?.toFixed(2) ?? "",
         });
         setFormError(null);
+        // Fetch positions for this deal
+        fetchPositions(deal._id);
     };
 
     const cancelForm = () => {
@@ -249,6 +265,103 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         setIsAdding(false);
         setRenewingParentId(null);
         setFormError(null);
+        setPositions([]);
+        setIsAddingPosition(false);
+    };
+
+    const fetchPositions = async (dealId: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/api/position?dealId=${dealId}`, { headers });
+            if (res.ok) setPositions(await res.json());
+        } catch { /* ignore */ }
+    };
+
+    const handleAddPosition = async () => {
+        const newPos: PositionRecord = {
+            _id: `temp_${Date.now()}`,
+            position: positions.length + 1,
+            frequency: positionForm.frequency,
+            funder: positionForm.funder,
+            monthlyPaymentAmount: positionForm.monthlyPaymentAmount ? parseFloat(stripCommas(positionForm.monthlyPaymentAmount)) : 0,
+            fundedDate: positionForm.fundedDate || "",
+            status: positionForm.status,
+        };
+
+        if (editingDeal) {
+            // Save to DB immediately when editing an existing deal
+            const payload = { dealId: editingDeal._id, ...newPos, _id: undefined };
+            try {
+                const res = await fetch(`${API_BASE}/api/position`, { method: "POST", headers, body: JSON.stringify(payload) });
+                if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to add position"); }
+                await fetchPositions(editingDeal._id);
+                await fetchDeals(selectedCorpId);
+            } catch (err) {
+                setFormError(err instanceof Error ? err.message : "Failed to add position");
+                return;
+            }
+        } else {
+            // Local state only for new deals — will be saved when the deal is saved
+            setPositions([...positions, newPos]);
+        }
+
+        setIsAddingPosition(false);
+        setPositionForm({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true });
+    };
+
+    const handleDeletePosition = async (posId: string) => {
+        if (!confirm("Delete this position?")) return;
+        if (posId.startsWith("temp_")) {
+            // Local-state only position (not yet saved)
+            setPositions(positions.filter(p => p._id !== posId));
+            return;
+        }
+        if (!editingDeal) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/position/${posId}?dealId=${editingDeal._id}`, { method: "DELETE", headers });
+            if (!res.ok) throw new Error("Failed to delete position");
+            await fetchPositions(editingDeal._id);
+            await fetchDeals(selectedCorpId);
+        } catch (err) {
+            setFormError(err instanceof Error ? err.message : "Delete position failed");
+        }
+    };
+
+    const startEditPosition = (pos: PositionRecord) => {
+        setEditingPositionId(pos._id);
+        setPositionForm({
+            frequency: pos.frequency || "",
+            funder: pos.funder || "",
+            monthlyPaymentAmount: pos.monthlyPaymentAmount?.toString() ?? "",
+            fundedDate: toDateInput(pos.fundedDate),
+            status: pos.status ?? true,
+        });
+    };
+
+    const handleSavePosition = async () => {
+        if (!editingPositionId) return;
+        const updated = {
+            frequency: positionForm.frequency,
+            funder: positionForm.funder,
+            monthlyPaymentAmount: positionForm.monthlyPaymentAmount ? parseFloat(stripCommas(positionForm.monthlyPaymentAmount)) : null,
+            fundedDate: positionForm.fundedDate || null,
+            status: positionForm.status,
+        };
+
+        if (editingPositionId.startsWith("temp_")) {
+            // Update local-state position
+            setPositions(positions.map(p => p._id === editingPositionId ? { ...p, ...updated, monthlyPaymentAmount: updated.monthlyPaymentAmount ?? 0, fundedDate: updated.fundedDate ?? "" } : p));
+        } else if (editingDeal) {
+            try {
+                const res = await fetch(`${API_BASE}/api/position/${editingPositionId}`, { method: "PUT", headers, body: JSON.stringify(updated) });
+                if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to update position"); }
+                await fetchPositions(editingDeal._id);
+            } catch (err) {
+                setFormError(err instanceof Error ? err.message : "Failed to update position");
+                return;
+            }
+        }
+        setEditingPositionId(null);
+        setPositionForm({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true });
     };
 
     const handleSave = async () => {
@@ -257,6 +370,23 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
         const payload = {
             corporationId: selectedCorpId,
+            grossMonthlyRevenue: formData.grossMonthlyRevenue ? parseFloat(stripCommas(formData.grossMonthlyRevenue)) : null,
+            ...(() => {
+                const freqMult = (freq: string) => freq === "Daily" ? 20 : freq === "Bi-Weekly" ? 10 : freq === "Weekly" ? 4 : 1;
+                const existing = positions.filter(p => p.status).reduce((sum, p) => sum + (p.monthlyPaymentAmount || 0) * freqMult(p.frequency), 0);
+                const pmtAmt = parseFloat(stripCommas(formData.paymentAmount)) || 0;
+                const thisDealMonthly = formData.weeklyOrDailyPayment === "true" ? pmtAmt * (52 / 12) : pmtAmt * (260 / 12);
+                const newMonthly = existing + thisDealMonthly;
+                const revNum = parseFloat(stripCommas(formData.grossMonthlyRevenue)) || 0;
+                return {
+                    existingMonthlyPayment: existing || null,
+                    existingMonthlyPaymentPercent: existing > 0 && revNum > 0 ? parseFloat(((existing / revNum) * 100).toFixed(2)) : null,
+                    monthlyPayment: thisDealMonthly || null,
+                    monthlyPaymentPercent: thisDealMonthly > 0 && revNum > 0 ? parseFloat(((thisDealMonthly / revNum) * 100).toFixed(2)) : null,
+                    newMonthlyPayment: newMonthly || null,
+                    newMonthlyPaymentPercent: newMonthly > 0 && revNum > 0 ? parseFloat(((newMonthly / revNum) * 100).toFixed(2)) : null,
+                };
+            })(),
             broker: formData.broker || null,
             typeOfDeal: formData.typeOfDeal,
             position: formData.position,
@@ -310,6 +440,22 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         method: "PUT",
                         headers,
                         body: JSON.stringify({ renewalDealId: resData._id }),
+                    });
+                }
+                // Save any pending local positions to the new deal
+                for (const pos of positions.filter(p => p._id.startsWith("temp_"))) {
+                    await fetch(`${API_BASE}/api/position`, {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify({
+                            dealId: resData._id,
+                            position: pos.position,
+                            frequency: pos.frequency,
+                            funder: pos.funder,
+                            monthlyPaymentAmount: pos.monthlyPaymentAmount,
+                            fundedDate: pos.fundedDate || null,
+                            status: pos.status,
+                        }),
                     });
                 }
             } else if (editingDeal) {
@@ -416,6 +562,100 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
     const formGrid = (
         <div>
+            {/* Section 0: Client Overview */}
+            <div className="form-section">
+                <div className="form-section-header">Client Overview</div>
+                <div className="form-grid-4">
+                    <div className="form-row" title="Client's total gross monthly revenue">
+                        <label>Gross Monthly Revenue</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">$</span>
+                            <input type="text" inputMode="decimal" placeholder="0.00" value={formData.grossMonthlyRevenue}
+                                onFocus={() => setFormData(f => ({ ...f, grossMonthlyRevenue: stripCommas(f.grossMonthlyRevenue) }))}
+                                onChange={(e) => setFormData({ ...formData, grossMonthlyRevenue: stripCommas(e.target.value) })}
+                                onBlur={(e) => { const v = parseFloat(stripCommas(e.target.value)); if (!isNaN(v)) setFormData((f) => ({ ...f, grossMonthlyRevenue: formatDollar(v.toFixed(2)) })); }}
+                            />
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: Sum of active position payment amounts adjusted for frequency ($ amount / % of Gross Monthly Revenue)">
+                        <label>Existing Monthly Payment $ / %</label>
+                        <div style={{ display: "flex", gap: "0.4rem" }}>
+                            <div className="input-prefixed" style={{ flex: 1 }}>
+                                <span className="input-prefix-symbol">$</span>
+                                <input type="text" value={(() => {
+                                    const freqMultiplier = (freq: string) => freq === "Daily" ? 20 : freq === "Bi-Weekly" ? 10 : freq === "Weekly" ? 4 : 1;
+                                    const total = positions.filter(p => p.status).reduce((sum, p) => sum + (p.monthlyPaymentAmount || 0) * freqMultiplier(p.frequency), 0);
+                                    return total > 0 ? formatDollar(total.toFixed(2)) : "";
+                                })()} disabled />
+                            </div>
+                            <div className="input-prefixed" style={{ flex: 1 }}>
+                                <span className="input-prefix-symbol">%</span>
+                                <input type="text" value={(() => {
+                                    const freqMultiplier = (freq: string) => freq === "Daily" ? 20 : freq === "Bi-Weekly" ? 10 : freq === "Weekly" ? 4 : 1;
+                                    const total = positions.filter(p => p.status).reduce((sum, p) => sum + (p.monthlyPaymentAmount || 0) * freqMultiplier(p.frequency), 0);
+                                    const revNum = parseFloat(stripCommas(formData.grossMonthlyRevenue)) || 0;
+                                    if (total <= 0 || revNum <= 0) return "";
+                                    return ((total / revNum) * 100).toFixed(2);
+                                })()} disabled />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: Payment Amount x days per month ($ amount / % of Gross Monthly Revenue)">
+                        <label>This Deal Monthly Payment $ / %</label>
+                        <div style={{ display: "flex", gap: "0.4rem" }}>
+                            <div className="input-prefixed" style={{ flex: 1 }}>
+                                <span className="input-prefix-symbol">$</span>
+                                <input type="text" value={(() => {
+                                    const pmtAmt = parseFloat(stripCommas(formData.paymentAmount)) || 0;
+                                    if (pmtAmt <= 0) return "";
+                                    const monthly = formData.weeklyOrDailyPayment === "true" ? pmtAmt * (52 / 12) : pmtAmt * (260 / 12);
+                                    return formatDollar(monthly.toFixed(2));
+                                })()} disabled />
+                            </div>
+                            <div className="input-prefixed" style={{ flex: 1 }}>
+                                <span className="input-prefix-symbol">%</span>
+                                <input type="text" value={(() => {
+                                    const pmtAmt = parseFloat(stripCommas(formData.paymentAmount)) || 0;
+                                    const revNum = parseFloat(stripCommas(formData.grossMonthlyRevenue)) || 0;
+                                    if (pmtAmt <= 0 || revNum <= 0) return "";
+                                    const monthly = formData.weeklyOrDailyPayment === "true" ? pmtAmt * (52 / 12) : pmtAmt * (260 / 12);
+                                    return ((monthly / revNum) * 100).toFixed(2);
+                                })()} disabled />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="form-row" title="Calculated: Existing Monthly Payment + Monthly Payment ($ amount / % of Gross Monthly Revenue)">
+                        <label>New Monthly Payment $ / %</label>
+                        <div style={{ display: "flex", gap: "0.4rem" }}>
+                            <div className="input-prefixed" style={{ flex: 1 }}>
+                                <span className="input-prefix-symbol">$</span>
+                                <input type="text" value={(() => {
+                                    const freqMultiplier = (freq: string) => freq === "Daily" ? 20 : freq === "Bi-Weekly" ? 10 : freq === "Weekly" ? 4 : 1;
+                                    const existing = positions.filter(p => p.status).reduce((sum, p) => sum + (p.monthlyPaymentAmount || 0) * freqMultiplier(p.frequency), 0);
+                                    const pmtAmt = parseFloat(stripCommas(formData.paymentAmount)) || 0;
+                                    const thisDealMonthly = formData.weeklyOrDailyPayment === "true" ? pmtAmt * (52 / 12) : pmtAmt * (260 / 12);
+                                    const total = existing + thisDealMonthly;
+                                    return total > 0 ? formatDollar(total.toFixed(2)) : "";
+                                })()} disabled />
+                            </div>
+                            <div className="input-prefixed" style={{ flex: 1 }}>
+                                <span className="input-prefix-symbol">%</span>
+                                <input type="text" value={(() => {
+                                    const freqMultiplier = (freq: string) => freq === "Daily" ? 20 : freq === "Bi-Weekly" ? 10 : freq === "Weekly" ? 4 : 1;
+                                    const existing = positions.filter(p => p.status).reduce((sum, p) => sum + (p.monthlyPaymentAmount || 0) * freqMultiplier(p.frequency), 0);
+                                    const pmtAmt = parseFloat(stripCommas(formData.paymentAmount)) || 0;
+                                    const thisDealMonthly = formData.weeklyOrDailyPayment === "true" ? pmtAmt * (52 / 12) : pmtAmt * (260 / 12);
+                                    const total = existing + thisDealMonthly;
+                                    const revNum = parseFloat(stripCommas(formData.grossMonthlyRevenue)) || 0;
+                                    if (total <= 0 || revNum <= 0) return "";
+                                    return ((total / revNum) * 100).toFixed(2);
+                                })()} disabled />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Section 1: Deal Details */}
             <div className="form-section">
                 <div className="form-section-header">Deal Details</div>
@@ -431,9 +671,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <label>Funded Date</label>
                         <input type="date" value={formData.fundedDate} onChange={(e) => setFormData({ ...formData, fundedDate: e.target.value })} />
                     </div>
-                    <div className="form-row" title="Number of lenders assigned to this deal">
+                    <div className="form-row" title="Number of open positions (auto-calculated from positions count + 1)">
                         <label>Position</label>
-                        <input type="text" value={formData.position} onChange={(e) => setFormData({ ...formData, position: e.target.value })} />
+                        <input type="text" value={positions.length + 1} disabled />
                     </div>
                     <div className="form-row" title="Has this client had a previous Merchant Cash Advance?">
                         <label>MCA History</label>
@@ -481,8 +721,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 <input type="number" step="0.01" placeholder="0.00" value={formData.originationFeePercent}
                                     onChange={(e) => {
                                         const pct = e.target.value; const pctNum = parseFloat(pct); const fundedNum = parseFloat(stripCommas(formData.fundedAmount));
-                                        const fee = pct !== "" && formData.fundedAmount !== "" ? ((pctNum / 100) * fundedNum).toFixed(2) : stripCommas(formData.originationFee);
-                                        const net = fee !== "" && formData.fundedAmount !== "" ? (fundedNum - parseFloat(fee)).toFixed(2) : formData.netFundedAmount;
+                                        const fee = pct !== "" && formData.fundedAmount !== "" ? ((pctNum / 100) * fundedNum).toFixed(2) : "";
+                                        const net = fee !== "" && formData.fundedAmount !== "" ? (fundedNum - parseFloat(fee)).toFixed(2) : formData.fundedAmount !== "" ? parseFloat(stripCommas(formData.fundedAmount)).toFixed(2) : "";
                                         setFormData({ ...formData, originationFeePercent: pct, originationFee: fee, netFundedAmount: net });
                                     }}
                                 />
@@ -493,7 +733,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     onFocus={() => setFormData(f => ({ ...f, originationFee: stripCommas(f.originationFee) }))}
                                     onChange={(e) => {
                                         const fee = stripCommas(e.target.value); const feeNum = parseFloat(fee); const fundedNum = parseFloat(stripCommas(formData.fundedAmount));
-                                        const pct = fee !== "" && formData.fundedAmount !== "" && fundedNum !== 0 ? ((feeNum / fundedNum) * 100).toFixed(2) : formData.originationFeePercent;
+                                        const pct = fee !== "" && formData.fundedAmount !== "" && fundedNum !== 0 ? ((feeNum / fundedNum) * 100).toFixed(2) : "";
                                         const net = fee !== "" && formData.fundedAmount !== "" ? (fundedNum - feeNum).toFixed(2) : formData.fundedAmount !== "" ? parseFloat(stripCommas(formData.fundedAmount)).toFixed(2) : "";
                                         setFormData({ ...formData, originationFee: fee, originationFeePercent: pct, netFundedAmount: net });
                                     }}
@@ -713,7 +953,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             })()} disabled />
                         </div>
                     </div>
-                    <div className="form-row" title="Calculated: (Total Payback w/ Fees & Expenses - Total Cash Out) / Total Payback w/ Fees & Expenses x 100">
+                    <div className="form-row" title="Calculated: (Total Payback w/ Fees & Expenses - Total Cash Out) / Total Cash Out x 100">
                         <label>Expected ROI</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">%</span>
@@ -726,12 +966,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 const netFunded = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
                                 const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
                                 const totalCashOut = netFunded + comm + expenses;
-                                if (totalWithFees <= 0) return "";
-                                return ((totalWithFees - totalCashOut) / totalWithFees * 100).toFixed(2);
+                                if (totalCashOut <= 0) return "";
+                                return ((totalWithFees - totalCashOut) / totalCashOut * 100).toFixed(2);
                             })()} disabled />
                         </div>
                     </div>
-                    <div className="form-row" title="Calculated: (Amount Paid In - Total Cash Out) / Amount Paid In x 100">
+                    <div className="form-row" title="Calculated: (Amount Paid In - Total Cash Out) / Total Cash Out x 100">
                         <label>Current ROI</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">%</span>
@@ -741,8 +981,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
                                 const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
                                 const totalCashOut = netFunded + comm + expenses;
-                                if (paidIn <= 0) return "";
-                                return ((paidIn - totalCashOut) / paidIn * 100).toFixed(2);
+                                if (totalCashOut <= 0) return "";
+                                return ((paidIn - totalCashOut) / totalCashOut * 100).toFixed(2);
                             })()} disabled />
                         </div>
                     </div>
@@ -846,6 +1086,85 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     </div>
                 </div>
             )}
+
+            {/* Section 8: Open Positions */}
+            <div className="form-section">
+                <div className="form-section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>Open Positions</span>
+                    <button className="btn btn-sm" onClick={() => setIsAddingPosition(true)} disabled={isAddingPosition} style={{ textTransform: "none", letterSpacing: "normal", fontSize: "0.75rem" }}>Add Position</button>
+                </div>
+                    <table className="dialog-table">
+                        <thead>
+                            <tr>
+                                <th style={{ textAlign: "center" }}>Position</th>
+                                <th style={{ textAlign: "center" }}>Frequency</th>
+                                <th>Funder</th>
+                                <th style={{ textAlign: "right" }}>Payment Amount</th>
+                                <th style={{ textAlign: "center" }}>Funded Date</th>
+                                <th style={{ textAlign: "center" }}>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {positions.map((pos) => (
+                                editingPositionId === pos._id ? (
+                                    <tr key={pos._id}>
+                                        <td style={{ textAlign: "center" }}>{pos.position}</td>
+                                        <td><select value={positionForm.frequency} onChange={(e) => setPositionForm({ ...positionForm, frequency: e.target.value })} style={{ width: "100%" }}><option value="">-- Select --</option><option value="Daily">Daily</option><option value="Bi-Weekly">Bi-Weekly</option><option value="Weekly">Weekly</option><option value="Monthly">Monthly</option></select></td>
+                                        <td><input type="text" value={positionForm.funder} onChange={(e) => setPositionForm({ ...positionForm, funder: e.target.value })} style={{ width: "100%" }} /></td>
+                                        <td><input type="number" step="0.01" placeholder="0.00" value={positionForm.monthlyPaymentAmount} onChange={(e) => setPositionForm({ ...positionForm, monthlyPaymentAmount: e.target.value })} style={{ width: "100%" }} /></td>
+                                        <td><input type="date" value={positionForm.fundedDate} onChange={(e) => setPositionForm({ ...positionForm, fundedDate: e.target.value })} style={{ width: "100%" }} /></td>
+                                        <td style={{ textAlign: "center" }}>
+                                            <select value={positionForm.status ? "true" : "false"} onChange={(e) => setPositionForm({ ...positionForm, status: e.target.value === "true" })}>
+                                                <option value="true">Active</option>
+                                                <option value="false">Inactive</option>
+                                            </select>
+                                        </td>
+                                        <td className="action-cell">
+                                            <button className="btn btn-sm btn-primary" onClick={handleSavePosition}>Save</button>
+                                            <button className="btn btn-sm" onClick={() => { setEditingPositionId(null); setPositionForm({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true }); }}>Cancel</button>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    <tr key={pos._id}>
+                                        <td style={{ textAlign: "center" }}>{pos.position}</td>
+                                        <td style={{ textAlign: "center" }}>{pos.frequency || "-"}</td>
+                                        <td>{pos.funder || "-"}</td>
+                                        <td style={{ textAlign: "right" }}>{pos.monthlyPaymentAmount != null ? formatCurrency(pos.monthlyPaymentAmount) : "-"}</td>
+                                        <td style={{ textAlign: "center" }}>{formatDate(pos.fundedDate)}</td>
+                                        <td style={{ textAlign: "center" }}>{pos.status ? "Active" : "Inactive"}</td>
+                                        <td className="action-cell">
+                                            <button className="btn btn-sm btn-success" onClick={() => startEditPosition(pos)} disabled={isAddingPosition || editingPositionId !== null}>Edit</button>
+                                            <button className="btn btn-sm btn-danger" onClick={() => handleDeletePosition(pos._id)} disabled={isAddingPosition || editingPositionId !== null}>Delete</button>
+                                        </td>
+                                    </tr>
+                                )
+                            ))}
+                            {positions.length === 0 && !isAddingPosition && (
+                                <tr><td colSpan={7} className="empty-row">No positions</td></tr>
+                            )}
+                            {isAddingPosition && (
+                                <tr>
+                                    <td style={{ textAlign: "center" }}>{positions.length + 1}</td>
+                                    <td><select value={positionForm.frequency} onChange={(e) => setPositionForm({ ...positionForm, frequency: e.target.value })} style={{ width: "100%" }}><option value="">-- Select --</option><option value="Daily">Daily</option><option value="Bi-Weekly">Bi-Weekly</option><option value="Weekly">Weekly</option><option value="Monthly">Monthly</option></select></td>
+                                    <td><input type="text" placeholder="Funder name" value={positionForm.funder} onChange={(e) => setPositionForm({ ...positionForm, funder: e.target.value })} style={{ width: "100%" }} /></td>
+                                    <td><input type="number" step="0.01" placeholder="0.00" value={positionForm.monthlyPaymentAmount} onChange={(e) => setPositionForm({ ...positionForm, monthlyPaymentAmount: e.target.value })} style={{ width: "100%" }} /></td>
+                                    <td><input type="date" value={positionForm.fundedDate} onChange={(e) => setPositionForm({ ...positionForm, fundedDate: e.target.value })} style={{ width: "100%" }} /></td>
+                                    <td style={{ textAlign: "center" }}>
+                                        <select value={positionForm.status ? "true" : "false"} onChange={(e) => setPositionForm({ ...positionForm, status: e.target.value === "true" })}>
+                                            <option value="true">Active</option>
+                                            <option value="false">Inactive</option>
+                                        </select>
+                                    </td>
+                                    <td className="action-cell">
+                                        <button className="btn btn-sm btn-primary" onClick={handleAddPosition}>Save</button>
+                                        <button className="btn btn-sm" onClick={() => { setIsAddingPosition(false); setPositionForm({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true }); }}>Cancel</button>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
         </div>
     );
 
