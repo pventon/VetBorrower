@@ -162,6 +162,8 @@ interface CorpFormData {
     lengthOfOwnership: number;
     stateOfTheBusiness: string;
     industryType: string;
+    ein: string;
+    typeOfBusiness: string;
     businessAddress: AddressFormData;
     owners: OwnerFormData[];
 }
@@ -178,7 +180,7 @@ const emptyOwner: OwnerFormData = {
 const emptyForm: CorpFormData = {
     businessName: "", dbaName: "", percentOfOwnership: 0,
     timeInBusiness: 0, businessStartDate: "", lengthOfOwnership: 0,
-    stateOfTheBusiness: "", industryType: "",
+    stateOfTheBusiness: "", industryType: "", ein: "", typeOfBusiness: "",
     businessAddress: { ...emptyAddress },
     owners: [{ ...emptyOwner }],
 };
@@ -275,6 +277,8 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
             lengthOfOwnership: corp.lengthOfOwnership ?? 0,
             stateOfTheBusiness: corp.stateOfTheBusiness ?? "",
             industryType: corp.industryType ?? "",
+            ein: corp.ein ?? "",
+            typeOfBusiness: corp.typeOfBusiness ?? "",
             businessAddress: corp.businessAddress
                 ? { ...corp.businessAddress }
                 : { ...emptyAddress },
@@ -469,6 +473,38 @@ export default function CorporationsDlg({ onClose }: CorporationsDlgProps) {
                                     }}
                                 />
                             </div>
+                        </div>
+                        <div style={{ display: "flex", gap: "1rem" }}>
+                            <div className="form-row" style={{ flex: 1 }}>
+                                <label>EIN</label>
+                                <input
+                                    type="text"
+                                    value={formData.ein}
+                                    onChange={(e) => {
+                                        const digits = e.target.value.replace(/\D/g, "").slice(0, 9);
+                                        const formatted = digits.length > 2 ? digits.slice(0, 2) + "-" + digits.slice(2) : digits;
+                                        setFormData({ ...formData, ein: formatted });
+                                    }}
+                                    placeholder="XX-XXXXXXX"
+                                    maxLength={10}
+                                />
+                            </div>
+                            <div className="form-row" style={{ flex: 1 }}>
+                                <label>Type of Business</label>
+                                <select
+                                    value={formData.typeOfBusiness}
+                                    onChange={(e) => setFormData({ ...formData, typeOfBusiness: e.target.value })}
+                                >
+                                    <option value="">-- Select --</option>
+                                    <option value="Corp">Corp</option>
+                                    <option value="LLC">LLC</option>
+                                    <option value="Sole Prop">Sole Prop</option>
+                                    <option value="Limited Partnership">Limited Partnership</option>
+                                    <option value="General Partnership">General Partnership</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div style={{ flex: 2 }} />
                         </div>
                     </div>
                 )}

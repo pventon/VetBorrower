@@ -54,6 +54,8 @@ const corporationSchema = new mongoose.Schema({
   lengthOfOwnership: Number,
   stateOfTheBusiness: String,     // US state the business operates in
   industryType: String,
+  ein: String,
+  typeOfBusiness: String,
   officeAcronym: String,
   deals: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Deals' }]
 

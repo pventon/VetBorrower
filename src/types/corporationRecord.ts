@@ -49,6 +49,8 @@ export interface CorporationRecord {
   lengthOfOwnership: number;
   stateOfTheBusiness: string;
   industryType: string;
+  ein: string;
+  typeOfBusiness: string;
   officeAcronym: string;
   deals: string[];
 }
