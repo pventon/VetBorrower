@@ -62,6 +62,7 @@ const dealSchema = new mongoose.Schema({
   renewalDate: Date,
   rolledBalance: Number,
   netNewCashOut: Number,
+  totalNetCashOut: Number,
 
   // Common to deals and renewals
   roi: Number,

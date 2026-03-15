@@ -57,6 +57,7 @@ export interface DealRecord {
   renewalDate: string;
   rolledBalance: number;
   netNewCashOut: number;
+  totalNetCashOut: number;
   roi: number;
   currentRoi: number;
   compoundTotalFunded: number;

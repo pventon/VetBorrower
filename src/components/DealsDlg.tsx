@@ -394,6 +394,14 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         return (d.fundedAmount || 0) - (d.rolledBalance || 0); // Renewal = funded minus rolled balance
     };
 
+    const calcDealTotalNetNewCashOut = (d: DealRecord): number => {
+        const netFunded = d.netFundedAmount || ((d.fundedAmount || 0) - (d.originationFee || 0));
+        const rolled = d.rolledBalance || 0;
+        const netNewCashOut = d.parentDealId ? Math.max(netFunded - rolled, 0) : netFunded;
+        const comm = d.brokerCommission || ((d.brokerFee || 0) / 100 * (d.fundedAmount || 0));
+        return netNewCashOut + comm;
+    };
+
     const startEditPosition = (pos: PositionRecord) => {
         setEditingPositionId(pos._id);
         setPositionForm({
@@ -580,8 +588,15 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             }, 0);
             const totalCollected = chain.reduce((s, d) => s + (d.amountPaidIn || 0) + (d.settledByRenewal || 0), 0);
             const netNewCap = chain.reduce((s, d) => s + (!d.parentDealId ? (d.fundedAmount || 0) : (d.fundedAmount || 0) - (d.rolledBalance || 0)), 0);
-            const expectedProfit = totalPayback - totalFunded;
-            const currentProfit = totalCollected - totalFunded;
+            const totalNetNewCashOut = chain.reduce((s, d) => {
+                const netFunded = d.netFundedAmount || ((d.fundedAmount || 0) - (d.originationFee || 0));
+                const rolled = d.rolledBalance || 0;
+                const netNewCO = d.parentDealId ? Math.max(netFunded - rolled, 0) : netFunded;
+                const comm = d.brokerCommission || ((d.brokerFee || 0) / 100 * (d.fundedAmount || 0));
+                return s + netNewCO + comm;
+            }, 0);
+            const expectedProfit = totalPayback - totalNetNewCashOut;
+            const currentProfit = totalCollected - totalNetNewCashOut;
 
             const compoundData = {
                 compoundTotalFunded: totalFunded,
@@ -590,9 +605,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 compoundNetNewCapital: netNewCap,
                 compoundExpectedProfit: expectedProfit,
                 compoundCurrentProfit: currentProfit,
-                compoundExpectedRoi: totalFunded > 0 ? parseFloat((expectedProfit / totalFunded * 100).toFixed(2)) : null,
+                compoundExpectedRoi: totalNetNewCashOut > 0 ? parseFloat((expectedProfit / totalNetNewCashOut * 100).toFixed(2)) : null,
                 compoundExpectedRoiOnCapital: netNewCap > 0 ? parseFloat((expectedProfit / netNewCap * 100).toFixed(2)) : null,
-                compoundCurrentRoi: totalFunded > 0 ? parseFloat((currentProfit / totalFunded * 100).toFixed(2)) : null,
+                compoundCurrentRoi: totalNetNewCashOut > 0 ? parseFloat((currentProfit / totalNetNewCashOut * 100).toFixed(2)) : null,
                 compoundCurrentRoiOnCapital: netNewCap > 0 ? parseFloat((currentProfit / netNewCap * 100).toFixed(2)) : null,
             };
 
@@ -1217,16 +1232,11 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 </div>
             </div>
 
-            {/* Section 7: Renewal */}
+            {/* Section 7: Renewal (only shown for renewals) */}
+            {formData.typeOfDeal === "renewal" && (
             <div className="form-section">
                 <div className="form-section-header">Renewal</div>
                 <div className="form-grid-3">
-                    <div className="form-row" title="Date this deal was renewed. Auto-populated when a renewal is saved">
-                        <label>Renewal Date</label>
-                        <input type="date" value={formData.renewalDate} disabled />
-                    </div>
-                    {formData.typeOfDeal === "renewal" ? (
-                        <>
                             <div className="form-row" title="Balance rolled over from the previous deal into this renewal">
                                 <label>Rolled Balance</label>
                                 <div className="input-prefixed">
@@ -1238,27 +1248,35 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     />
                                 </div>
                             </div>
-                            <div className="form-row" title="Calculated: Funded Amount - Rolled Balance. The actual new cash disbursed to the client">
+                            <div className="form-row" title="Calculated: Net Funded Amount - Rolled Balance. The actual new cash disbursed to the client">
                                 <label>Net New Cash Out</label>
                                 <div className="input-prefixed">
                                     <span className="input-prefix-symbol">$</span>
                                     <input type="text" value={(() => {
-                                        const funded = parseFloat(stripCommas(formData.fundedAmount)) || 0;
+                                        const netFunded = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
                                         const rolled = parseFloat(stripCommas(formData.rolledBalance)) || 0;
-                                        const netNew = funded - rolled;
-                                        return funded > 0 ? formatDollar((netNew > 0 ? netNew : 0).toFixed(2)) : "";
+                                        const netNew = netFunded - rolled;
+                                        return netFunded > 0 ? formatDollar((netNew > 0 ? netNew : 0).toFixed(2)) : "";
                                     })()} disabled />
                                 </div>
                             </div>
-                        </>
-                    ) : (
-                        <>
-                            <div />
-                            <div />
-                        </>
-                    )}
+                            <div className="form-row" title="Calculated: Net New Cash Out + Broker Commission">
+                                <label>Total Net New Cash Out</label>
+                                <div className="input-prefixed">
+                                    <span className="input-prefix-symbol">$</span>
+                                    <input type="text" value={(() => {
+                                        const netFunded = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
+                                        const rolled = parseFloat(stripCommas(formData.rolledBalance)) || 0;
+                                        const netNew = netFunded - rolled;
+                                        const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
+                                        const total = (netNew > 0 ? netNew : 0) + comm;
+                                        return total > 0 ? formatDollar(total.toFixed(2)) : "";
+                                    })()} disabled />
+                                </div>
+                            </div>
                 </div>
             </div>
+            )}
 
             {/* Section 8: Compound Performance (shown when deal is part of a renewal chain or adding a renewal) */}
             {(() => {
@@ -1310,6 +1328,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     compoundNetNewCapital: 0, compoundExpectedProfit: 0, compoundCurrentProfit: 0,
                     compoundExpectedRoi: 0, compoundExpectedRoiOnCapital: 0,
                     compoundCurrentRoi: 0, compoundCurrentRoiOnCapital: 0,
+                    totalNetCashOut: 0,
                     positions: [], dealState: "active",
                     renewalDate: formData.renewalDate || "",
                     renewalDealId: editingDeal?.renewalDealId ?? null,
@@ -1363,11 +1382,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 const compoundTotalPayback = chain.reduce((s, d) => s + calcDealTotalPaybackWithFees(d), 0);
                 const compoundTotalCollected = chain.reduce((s, d) => s + (d.amountPaidIn || 0) + (d.settledByRenewal || 0), 0);
                 const compoundNetNewCapital = chain.reduce((s, d) => s + calcDealNetNewCapital(d), 0);
-                const compoundExpectedProfit = compoundTotalPayback - compoundTotalFunded;
-                const compoundCurrentProfit = compoundTotalCollected - compoundTotalFunded;
-                const compoundExpectedRoi = compoundTotalFunded > 0 ? (compoundExpectedProfit / compoundTotalFunded * 100) : 0;
+                const compoundTotalNetNewCashOut = chain.reduce((s, d) => s + calcDealTotalNetNewCashOut(d), 0);
+                const compoundExpectedProfit = compoundTotalPayback - compoundTotalNetNewCashOut;
+                const compoundCurrentProfit = compoundTotalCollected - compoundTotalNetNewCashOut;
+                const compoundExpectedRoi = compoundTotalNetNewCashOut > 0 ? (compoundExpectedProfit / compoundTotalNetNewCashOut * 100) : 0;
                 const compoundExpectedRoiOnCapital = compoundNetNewCapital > 0 ? (compoundExpectedProfit / compoundNetNewCapital * 100) : 0;
-                const compoundCurrentRoi = compoundTotalFunded > 0 ? (compoundCurrentProfit / compoundTotalFunded * 100) : 0;
+                const compoundCurrentRoi = compoundTotalNetNewCashOut > 0 ? (compoundCurrentProfit / compoundTotalNetNewCashOut * 100) : 0;
                 const compoundCurrentRoiOnCapital = compoundNetNewCapital > 0 ? (compoundCurrentProfit / compoundNetNewCapital * 100) : 0;
 
                 const currentId = editingDeal?._id ?? "current";
@@ -1413,22 +1433,31 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         </tr>
                                     );
                                 })}
-                                <tr className="ledger-totals">
-                                    <td style={{ textAlign: "left" }}>Totals</td>
-                                    <td></td>
-                                    <td>{formatCurrency(compoundTotalFunded)}</td>
-                                    <td></td>
-                                    <td>{formatCurrency(compoundNetNewCapital)}</td>
-                                    <td>{formatCurrency(compoundTotalPayback)}</td>
-                                    <td>{formatCurrency(compoundTotalCollected)}</td>
-                                    <td style={{ color: compoundCurrentProfit >= 0 ? "#2e7d32" : "#c62828" }}>{formatCurrency(compoundCurrentProfit)}</td>
-                                    <td></td>
-                                </tr>
+                                {(() => {
+                                    const totalLedgerProfit = chain.reduce((s, d) => {
+                                        const received = (d.amountPaidIn || 0) + (d.settledByRenewal || 0);
+                                        return s + (received - (d.fundedAmount || 0));
+                                    }, 0);
+                                    const totalRolledBalance = chain.reduce((s, d) => s + (d.rolledBalance || 0), 0);
+                                    return (
+                                        <tr className="ledger-totals">
+                                            <td style={{ textAlign: "left" }}>Totals</td>
+                                            <td></td>
+                                            <td>{formatCurrency(compoundTotalFunded)}</td>
+                                            <td>{formatCurrency(totalRolledBalance)}</td>
+                                            <td>{formatCurrency(compoundNetNewCapital)}</td>
+                                            <td>{formatCurrency(compoundTotalPayback)}</td>
+                                            <td>{formatCurrency(compoundTotalCollected)}</td>
+                                            <td style={{ color: totalLedgerProfit >= 0 ? "#2e7d32" : "#c62828" }}>{formatCurrency(totalLedgerProfit)}</td>
+                                            <td></td>
+                                        </tr>
+                                    );
+                                })()}
                             </tbody>
                         </table>
                         <div className="compound-metrics">
                             <div className="compound-metric-card">
-                                <div className="metric-label">Expected ROI (on Funded)</div>
+                                <div className="metric-label">Expected ROI (on Cash Out)</div>
                                 <div className={`metric-value ${compoundExpectedRoi >= 0 ? "positive" : "negative"}`}>{compoundExpectedRoi.toFixed(2)}%</div>
                             </div>
                             <div className="compound-metric-card">
@@ -1436,7 +1465,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 <div className={`metric-value ${compoundExpectedRoiOnCapital >= 0 ? "positive" : "negative"}`}>{compoundExpectedRoiOnCapital.toFixed(2)}%</div>
                             </div>
                             <div className="compound-metric-card">
-                                <div className="metric-label">Current ROI (on Funded)</div>
+                                <div className="metric-label">Current ROI (on Cash Out)</div>
                                 <div className={`metric-value ${compoundCurrentRoi >= 0 ? "positive" : "negative"}`}>{compoundCurrentRoi.toFixed(2)}%</div>
                             </div>
                             <div className="compound-metric-card">
@@ -1678,44 +1707,61 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <p>When a deal is renewed, the compound performance section aggregates financial data across the entire renewal chain — from the original deal through every subsequent renewal.</p>
 
                         <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>The Ledger Table</h3>
-                        <p>Each row represents one deal in the chain, showing:</p>
+                        <p>Each row represents one deal in the chain:</p>
                         <ul style={{ marginLeft: "1.5rem", marginBottom: "0.5rem" }}>
                             <li><strong>Funded</strong> — Total amount funded for that deal</li>
                             <li><strong>Rolled Balance</strong> — Amount from the renewal used to pay off the previous deal's outstanding balance</li>
-                            <li><strong>Net New Capital</strong> — The actual new money at risk. For the original deal, this equals the full funded amount. For renewals: Funded Amount − Rolled Balance</li>
-                            <li><strong>Total Payback</strong> — Total Payback + Misc Fees + Misc Expenses − Discount</li>
-                            <li><strong>Paid In</strong> — Amount actually received from the borrower</li>
-                            <li><strong>Profit</strong> — Amount Paid In − Funded Amount</li>
+                            <li><strong>Net New Capital</strong> — For the original deal: the full Funded Amount. For renewals: Funded Amount − Rolled Balance</li>
+                            <li><strong>Total Payback</strong> — (Funded Amount × Factor Rate) + Misc Fees + Misc Expenses − Discount</li>
+                            <li><strong>Paid In</strong> — Total amount received: Amount Paid In + Settled by Renewal</li>
+                            <li><strong>Profit</strong> — Paid In − Funded Amount (per-deal profit)</li>
+                        </ul>
+                        <p>The <strong>Totals</strong> row sums each column across all deals in the chain. The Totals Profit is the sum of individual deal profits.</p>
+
+                        <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Key Definitions</h3>
+                        <ul style={{ marginLeft: "1.5rem", marginBottom: "0.5rem" }}>
+                            <li><strong>Total Net New Cash Out</strong> (per deal) = Net New Cash Out + Broker Commission. For the original deal, Net New Cash Out = Net Funded Amount. For renewals, Net New Cash Out = Net Funded Amount − Rolled Balance.</li>
+                            <li><strong>Settled by Renewal</strong> — When a deal is renewed, the renewal's Rolled Balance settles the previous deal's outstanding amount. This is added to the previous deal's Paid In.</li>
                         </ul>
 
                         <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Compound Metrics</h3>
+                        <p>These metrics use Total Net New Cash Out (summed across the chain) as the cost basis, representing the actual money disbursed.</p>
 
-                        <p><strong>Expected ROI (on Funded)</strong></p>
-                        <p style={{ marginLeft: "1rem", color: "#555" }}>= (Total Expected Payback − Total Funded) / Total Funded × 100</p>
-                        <p style={{ marginLeft: "1rem", fontSize: "0.82rem", color: "#777" }}>Conservative measure — what percentage return do we expect on the total money we put up?</p>
+                        <p style={{ marginTop: "0.5rem" }}><strong>Expected ROI (on Cash Out)</strong></p>
+                        <p style={{ marginLeft: "1rem", color: "#555" }}>= (Total Expected Payback − Total Net New Cash Out) / Total Net New Cash Out × 100</p>
 
                         <p style={{ marginTop: "0.5rem" }}><strong>Expected ROI (on Net Capital)</strong></p>
-                        <p style={{ marginLeft: "1rem", color: "#555" }}>= (Total Expected Payback − Total Funded) / Total Net New Capital × 100</p>
-                        <p style={{ marginLeft: "1rem", fontSize: "0.82rem", color: "#777" }}>This is where compounding shows. Each renewal reuses capital via the rolled balance, so the net new capital is lower than the funded amount. This drives the ROI higher with each renewal.</p>
+                        <p style={{ marginLeft: "1rem", color: "#555" }}>= (Total Expected Payback − Total Net New Cash Out) / Total Net New Capital × 100</p>
+                        <p style={{ marginLeft: "1rem", fontSize: "0.82rem", color: "#777" }}>Net New Capital is lower than Total Net New Cash Out because it excludes broker commissions and origination fees. Each renewal further reduces it via the rolled balance, driving this ROI higher with each renewal.</p>
 
-                        <p style={{ marginTop: "0.5rem" }}><strong>Current ROI (on Funded / Net Capital)</strong></p>
-                        <p style={{ marginLeft: "1rem", color: "#555" }}>Same formulas but using actual Amount Paid In instead of expected payback.</p>
+                        <p style={{ marginTop: "0.5rem" }}><strong>Current ROI (on Cash Out / Net Capital)</strong></p>
+                        <p style={{ marginLeft: "1rem", color: "#555" }}>Same formulas as above but using actual Total Collected (Amount Paid In + Settled by Renewal across all deals) instead of expected payback.</p>
+
+                        <p style={{ marginTop: "0.5rem" }}><strong>Expected / Current Compound Profit</strong></p>
+                        <p style={{ marginLeft: "1rem", color: "#555" }}>= Total Expected Payback (or Total Collected) − Total Net New Cash Out</p>
+                        <p style={{ marginLeft: "1rem", fontSize: "0.82rem", color: "#777" }}>Note: Compound Profit differs from the Ledger Totals Profit because it uses Total Net New Cash Out as the cost basis (actual cash disbursed) rather than the Funded Amount.</p>
 
                         <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Why ROI Improves With Renewals</h3>
-                        <p>Each renewal funds a new deal, but part of that money (the rolled balance) pays off the previous deal. This means:</p>
+                        <p>Each renewal funds a new deal, but part of that money (the rolled balance) pays off the previous deal:</p>
                         <ul style={{ marginLeft: "1.5rem" }}>
-                            <li>The previous deal is fully satisfied (all payback collected)</li>
-                            <li>The new deal only requires (Funded − Rolled Balance) of truly new capital</li>
-                            <li>But the borrower owes the full payback amount on the new funded amount</li>
-                            <li>Result: less new money at risk, same return — higher ROI on net capital</li>
+                            <li>The previous deal is fully satisfied — all payback collected via client payments + settled by renewal</li>
+                            <li>The new deal only requires (Net Funded Amount − Rolled Balance) of truly new capital</li>
+                            <li>The borrower owes the full payback amount on the new funded amount</li>
+                            <li>Less new money at risk per renewal, same return — compounding ROI on net capital</li>
                         </ul>
 
                         <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Example</h3>
-                        <p>Deal 1: Fund $10,000 at 1.35 factor. Payback = $13,500. Client pays 50% ($6,750), outstanding = $6,750.</p>
-                        <p>Deal 2 (renewal): Fund $10,000 at 1.35. Rolled Balance = $6,750. Net new capital = $3,250. Payback = $13,500.</p>
-                        <p style={{ marginTop: "0.5rem" }}><strong>Expected ROI on Funded:</strong> ($27,000 − $20,000) / $20,000 = 35%</p>
-                        <p><strong>Expected ROI on Net Capital:</strong> ($27,000 − $20,000) / $13,250 = 52.83%</p>
-                        <p style={{ fontSize: "0.82rem", color: "#777", marginTop: "0.3rem" }}>The ROI on net capital is higher because $6,750 of Deal 2 recycled existing capital rather than requiring new funds.</p>
+                        <p>Deal 1: Fund $10,000, Origination Fee 5% ($500), Net Funded $9,500, Broker Commission $1,000, Factor Rate 1.35.</p>
+                        <p>Total Payback = $13,500. Total Net New Cash Out = $9,500 + $1,000 = $10,500.</p>
+                        <p>Client pays 50% ($6,750). Outstanding = $6,750.</p>
+                        <p style={{ marginTop: "0.5rem" }}>Deal 2 (renewal): Fund $10,000, same terms. Rolled Balance = $6,750.</p>
+                        <p>Net New Cash Out = $9,500 − $6,750 = $2,750. Total Net New Cash Out = $2,750 + $1,000 = $3,750.</p>
+                        <p>Deal 1 is settled: Paid In = $6,750 (client) + $6,750 (settled by renewal) = $13,500.</p>
+
+                        <p style={{ marginTop: "0.5rem" }}><strong>Ledger Totals Profit:</strong> ($13,500 − $10,000) + ($13,500 − $10,000) = $7,000</p>
+                        <p><strong>Compound Profit:</strong> $27,000 − $14,250 = $12,750</p>
+                        <p><strong>Expected ROI (on Cash Out):</strong> $12,750 / $14,250 = 89.47%</p>
+                        <p><strong>Expected ROI (on Net Capital):</strong> $12,750 / $13,250 = 96.23%</p>
                     </div>
                     <div className="dialog-footer">
                         <button className="btn" onClick={() => setShowCompoundInfo(false)}>Close</button>
