@@ -611,11 +611,11 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 compoundCurrentRoiOnCapital: netNewCap > 0 ? parseFloat((currentProfit / netNewCap * 100).toFixed(2)) : null,
             };
 
-            // Update all deals in the chain with compound data
+            // Update all deals in the chain with compound data (skip state derivation)
             for (const d of chain) {
                 await fetch(`${API_BASE}/api/deal/${d._id}`, {
                     method: "PUT", headers,
-                    body: JSON.stringify(compoundData),
+                    body: JSON.stringify({ ...compoundData, _skipStateDeriv: true }),
                 });
             }
         }
@@ -1329,7 +1329,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     compoundExpectedRoi: 0, compoundExpectedRoiOnCapital: 0,
                     compoundCurrentRoi: 0, compoundCurrentRoiOnCapital: 0,
                     totalNetCashOut: 0,
-                    positions: [],
+                    positions: [], dealState: "",
                     renewalDate: formData.renewalDate || "",
                     renewalDealId: editingDeal?.renewalDealId ?? null,
                     parentDealId: editingDeal?.parentDealId ?? renewingParentId,

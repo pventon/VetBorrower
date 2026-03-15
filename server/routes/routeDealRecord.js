@@ -80,12 +80,15 @@ router.post('/api/deal', authenticateToken, async (req, res) => {
 // Update a deal
 router.put('/api/deal/:id', authenticateToken, async (req, res) => {
   try {
-    const dealData = { ...req.body, officeAcronym: req.user.officeAcronym };
-    // Merge with existing deal data to derive state accurately
+    const { _skipStateDeriv, ...bodyData } = req.body;
+    const dealData = { ...bodyData, officeAcronym: req.user.officeAcronym };
     const existing = await GetDealById(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Deal not found' });
-    const merged = { ...existing.toObject(), ...dealData };
-    dealData.dealState = deriveDealState(merged);
+    if (!_skipStateDeriv) {
+      // Merge with existing deal data to derive state accurately
+      const merged = { ...existing.toObject(), ...dealData };
+      dealData.dealState = deriveDealState(merged);
+    }
     const record = await UpdateDeal(req.params.id, dealData);
     res.json(record);
   } catch (error) {
