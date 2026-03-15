@@ -31,7 +31,8 @@ interface SystemSettingsDialogProps {
 type TabName = "general" | "industryTypes" | "usStates" | "userRoles" | "funders";
 
 export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogProps) {
-    const { token, hasRole } = useAuth();
+    const { token, hasRole, user: currentUser } = useAuth();
+    const isRoot = hasRole("root");
     const { settings, refreshSettings } = useSettings();
     const [activeTab, setActiveTab] = useState<TabName>(hasRole("root") ? "general" : "industryTypes");
     const [error, setError] = useState<string | null>(null);
@@ -52,6 +53,8 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
     const [editingFunderId, setEditingFunderId] = useState<string | null>(null);
     const [funderFormName, setFunderFormName] = useState("");
     const [isAddingFunder, setIsAddingFunder] = useState(false);
+    const [funderFormOffice, setFunderFormOffice] = useState("");
+    const [officeAcronyms, setOfficeAcronyms] = useState<string[]>([]);
 
     useEffect(() => {
         if (settings) {
@@ -66,24 +69,35 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
 
     const fetchFunders = async () => {
         try {
-            const res = await fetch(`${API_BASE}/api/funder`, { headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
+            const url = isRoot ? `${API_BASE}/api/funder` : `${API_BASE}/api/funder?officeAcronym=${currentUser?.officeAcronym}`;
+            const res = await fetch(url, { headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
             if (res.ok) setFundersList(await res.json());
         } catch { /* ignore */ }
     };
 
-    useEffect(() => { fetchFunders(); }, []);
+    const fetchOfficeAcronyms = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/office/acronyms`, { headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
+            if (res.ok) setOfficeAcronyms(await res.json());
+        } catch { /* ignore */ }
+    };
+
+    useEffect(() => { fetchFunders(); if (isRoot) fetchOfficeAcronyms(); }, []);
 
     const handleAddFunder = async () => {
         if (!funderFormName.trim()) return;
+        const office = isRoot ? funderFormOffice : (currentUser?.officeAcronym ?? "");
+        if (!office) { setError("An office must be selected."); return; }
         try {
             const res = await fetch(`${API_BASE}/api/funder`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ funderName: funderFormName }),
+                body: JSON.stringify({ funderName: funderFormName, officeAcronym: office }),
             });
             if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to add funder"); }
             setFunderFormName("");
             setIsAddingFunder(false);
+            setFunderFormOffice("");
             await fetchFunders();
             setSuccess("Funder added successfully.");
         } catch (err) {
@@ -97,11 +111,12 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
             const res = await fetch(`${API_BASE}/api/funder/${editingFunderId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ funderName: funderFormName }),
+                body: JSON.stringify({ funderName: funderFormName, officeAcronym: isRoot ? funderFormOffice : (currentUser?.officeAcronym ?? "") }),
             });
             if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to update funder"); }
             setEditingFunderId(null);
             setFunderFormName("");
+            setFunderFormOffice("");
             await fetchFunders();
             setSuccess("Funder updated successfully.");
         } catch (err) {
@@ -332,11 +347,12 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
 
                         {activeTab === "funders" && (
                             <div>
-                                <button className="btn btn-sm" onClick={() => { setIsAddingFunder(true); setFunderFormName(""); }} disabled={isAddingFunder || editingFunderId !== null}>Add Funder</button>
+                                <button className="btn btn-sm" onClick={() => { setIsAddingFunder(true); setFunderFormName(""); setFunderFormOffice(isRoot ? "" : (currentUser?.officeAcronym ?? "")); }} disabled={isAddingFunder || editingFunderId !== null}>Add Funder</button>
                                 <table className="dialog-table settings-array-table">
                                     <thead>
                                         <tr>
                                             <th>Funder Name</th>
+                                            {isRoot && <th>Office</th>}
                                             <th></th>
                                         </tr>
                                     </thead>
@@ -347,16 +363,25 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
                                                     <td>
                                                         <input type="text" value={funderFormName} onChange={(e) => setFunderFormName(e.target.value)} style={{ width: "100%" }} />
                                                     </td>
+                                                    {isRoot && (
+                                                        <td>
+                                                            <select value={funderFormOffice} onChange={(e) => setFunderFormOffice(e.target.value)} style={{ width: "100%" }}>
+                                                                <option value="">-- Select --</option>
+                                                                {officeAcronyms.map(a => <option key={a} value={a}>{a}</option>)}
+                                                            </select>
+                                                        </td>
+                                                    )}
                                                     <td>
                                                         <button className="btn btn-sm btn-primary" onClick={handleUpdateFunder}>Save</button>
-                                                        <button className="btn btn-sm" onClick={() => { setEditingFunderId(null); setFunderFormName(""); }}>Cancel</button>
+                                                        <button className="btn btn-sm" onClick={() => { setEditingFunderId(null); setFunderFormName(""); setFunderFormOffice(""); }}>Cancel</button>
                                                     </td>
                                                 </tr>
                                             ) : (
                                                 <tr key={f._id}>
                                                     <td>{f.funderName}</td>
+                                                    {isRoot && <td>{f.officeAcronym || "-"}</td>}
                                                     <td>
-                                                        <button className="btn btn-sm btn-success" onClick={() => { setEditingFunderId(f._id); setFunderFormName(f.funderName); }} disabled={isAddingFunder || editingFunderId !== null}>Edit</button>
+                                                        <button className="btn btn-sm btn-success" onClick={() => { setEditingFunderId(f._id); setFunderFormName(f.funderName); setFunderFormOffice(f.officeAcronym || ""); }} disabled={isAddingFunder || editingFunderId !== null}>Edit</button>
                                                         <button className="btn btn-sm btn-danger" onClick={() => handleDeleteFunder(f._id)} disabled={isAddingFunder || editingFunderId !== null}>Delete</button>
                                                     </td>
                                                 </tr>
@@ -367,14 +392,22 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
                                                 <td>
                                                     <input type="text" placeholder="Enter funder name" value={funderFormName} onChange={(e) => setFunderFormName(e.target.value)} style={{ width: "100%" }} />
                                                 </td>
+                                                {isRoot && (
+                                                    <td>
+                                                        <select value={funderFormOffice} onChange={(e) => setFunderFormOffice(e.target.value)} style={{ width: "100%" }}>
+                                                            <option value="">-- Select --</option>
+                                                            {officeAcronyms.map(a => <option key={a} value={a}>{a}</option>)}
+                                                        </select>
+                                                    </td>
+                                                )}
                                                 <td>
                                                     <button className="btn btn-sm btn-primary" onClick={handleAddFunder}>Save</button>
-                                                    <button className="btn btn-sm" onClick={() => { setIsAddingFunder(false); setFunderFormName(""); }}>Cancel</button>
+                                                    <button className="btn btn-sm" onClick={() => { setIsAddingFunder(false); setFunderFormName(""); setFunderFormOffice(""); }}>Cancel</button>
                                                 </td>
                                             </tr>
                                         )}
                                         {fundersList.length === 0 && !isAddingFunder && (
-                                            <tr><td colSpan={2} className="empty-row">No funders configured</td></tr>
+                                            <tr><td colSpan={isRoot ? 3 : 2} className="empty-row">No funders configured</td></tr>
                                         )}
                                     </tbody>
                                 </table>

@@ -141,7 +141,7 @@ function toDateInput(value: string | undefined): string {
 }
 
 export default function DealsDlg({ onClose }: DealsDlgProps) {
-    const { token } = useAuth();
+    const { token, user: currentUser } = useAuth();
     const [corporations, setCorporations] = useState<CorporationRecord[]>([]);
     const [selectedCorpId, setSelectedCorpId] = useState<string>("");
     const [deals, setDeals] = useState<DealRecord[]>([]);
@@ -169,7 +169,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 const [corpRes, brokerRes, funderRes] = await Promise.all([
                     fetch(`${API_BASE}/api/corporation`, { headers }),
                     fetch(`${API_BASE}/api/broker`, { headers }),
-                    fetch(`${API_BASE}/api/funder`, { headers }),
+                    fetch(`${API_BASE}/api/funder?officeAcronym=${currentUser?.officeAcronym ?? ""}`, { headers }),
                 ]);
                 if (!corpRes.ok) throw new Error("Failed to fetch corporations");
                 if (!brokerRes.ok) throw new Error("Failed to fetch brokers");
@@ -213,7 +213,15 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         setIsAdding(false);
         setEditingDeal(deal);
         setFormData({
-            grossMonthlyRevenue: deal.grossMonthlyRevenue != null ? formatDollar(deal.grossMonthlyRevenue.toFixed(2)) : "",
+            grossMonthlyRevenue: (() => {
+                if (deal.grossMonthlyRevenue) return formatDollar(deal.grossMonthlyRevenue.toFixed(2));
+                // For renewals with no value, inherit from parent
+                if (deal.parentDealId) {
+                    const parent = deals.find(d => d._id === deal.parentDealId);
+                    if (parent?.grossMonthlyRevenue) return formatDollar(parent.grossMonthlyRevenue.toFixed(2));
+                }
+                return "";
+            })(),
             monthlyPayment: deal.monthlyPayment != null ? formatDollar(deal.monthlyPayment.toFixed(2)) : "",
             monthlyPaymentPercent: deal.monthlyPaymentPercent?.toFixed(2) ?? "",
             broker: deal.broker?._id ?? "",
@@ -256,7 +264,24 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             totalCashOut: deal.totalCashOut != null ? formatDollar(deal.totalCashOut.toFixed(2)) : "",
             totalPaybackWithFeesAndExpenses: deal.totalPaybackWithFeesAndExpenses != null ? formatDollar(deal.totalPaybackWithFeesAndExpenses.toFixed(2)) : "",
             netProfit: deal.netProfit != null ? formatDollar(deal.netProfit.toFixed(2)) : "",
-            rolledBalance: deal.rolledBalance != null ? formatDollar(deal.rolledBalance.toFixed(2)) : "",
+            rolledBalance: (() => {
+                if (deal.rolledBalance) return formatDollar(deal.rolledBalance.toFixed(2));
+                // For renewals with no value, calculate from parent's Outstanding Amount Owed
+                if (deal.parentDealId) {
+                    const parent = deals.find(d => d._id === deal.parentDealId);
+                    if (parent) {
+                        const payback = parent.totalPaybackAmount || 0;
+                        const fees = parent.miscellaneousFees || 0;
+                        const expenses = parent.miscellaneousExpenses || 0;
+                        const disc = parent.discount || 0;
+                        const totalWithFees = payback + fees + expenses - disc;
+                        const paidIn = parent.amountPaidIn || 0;
+                        const outstanding = totalWithFees - paidIn;
+                        if (outstanding > 0) return formatDollar(outstanding.toFixed(2));
+                    }
+                }
+                return "";
+            })(),
             netNewCashOut: deal.netNewCashOut != null ? formatDollar(deal.netNewCashOut.toFixed(2)) : "",
             roi: deal.roi?.toFixed(2) ?? "",
             currentRoi: deal.currentRoi?.toFixed(2) ?? "",
@@ -341,7 +366,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         if (existing) return titleCased;
         // Create new funder
         try {
-            const res = await fetch(`${API_BASE}/api/funder`, { method: "POST", headers, body: JSON.stringify({ funderName: name }) });
+            const res = await fetch(`${API_BASE}/api/funder`, { method: "POST", headers, body: JSON.stringify({ funderName: name, officeAcronym: currentUser?.officeAcronym }) });
             if (res.ok) {
                 const newFunder = await res.json();
                 setFunders(prev => [...prev, newFunder].sort((a, b) => a.funderName.localeCompare(b.funderName)));
@@ -530,11 +555,23 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         setEditingDeal(null);
         setRenewingParentId(deal._id);
         const today = new Date().toISOString().split("T")[0];
+
+        // Calculate Outstanding Amount Owed from parent deal for Rolled Balance
+        const payback = deal.totalPaybackAmount || 0;
+        const fees = deal.miscellaneousFees || 0;
+        const expenses = deal.miscellaneousExpenses || 0;
+        const disc = deal.discount || 0;
+        const totalWithFees = payback + fees + expenses - disc;
+        const paidIn = deal.amountPaidIn || 0;
+        const outstanding = totalWithFees - paidIn;
+
         setFormData({
             ...emptyForm,
             broker: deal.broker?._id ?? "",
             typeOfDeal: "renewal",
             fundedDate: today,
+            grossMonthlyRevenue: deal.grossMonthlyRevenue ? formatDollar(deal.grossMonthlyRevenue.toFixed(2)) : "",
+            rolledBalance: outstanding > 0 ? formatDollar(outstanding.toFixed(2)) : "",
         });
         setFormError(null);
         setIsAdding(true);
@@ -800,7 +837,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             }}
                         />
                     </div>
-                    <div className="form-row" title="Broker's fee as a percentage. Commission = (Broker Fee / 100) x Funded Amount">
+                    <div className="form-row" title="Broker's fee as a percentage.">
                         <label>Broker Fee</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">%</span>
@@ -1218,7 +1255,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             style={{ flex: 1 }}
                             disabled={isAdding || showForm}
                         >
-                            <option value="">-- Select Corporation --</option>
+                            <option value="">-- Select Funded Client --</option>
                             {corporations.map((c) => (
                                 <option key={c._id} value={c._id}>
                                     {c.businessName}{c.dbaName ? ` (${c.dbaName})` : ""}

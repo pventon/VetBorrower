@@ -16,7 +16,8 @@
 import mongoose from 'mongoose';
 
 const funderSchema = new mongoose.Schema({
-  funderName: { type: String, unique: true },
+  funderName: String,
+  officeAcronym: String,
 }, {
   collection: "funders"
 });

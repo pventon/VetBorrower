@@ -22,8 +22,8 @@ function toTitleCase(str) {
   return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase());
 }
 
-export async function GetAllFunders() {
-  return await FundersModel.find({}).sort({ funderName: 1 });
+export async function GetAllFunders(filter = {}) {
+  return await FundersModel.find(filter).sort({ funderName: 1 });
 }
 
 export async function GetFunderById(id) {
@@ -33,20 +33,25 @@ export async function GetFunderById(id) {
 export async function AddFunder(data) {
   const name = toTitleCase((data.funderName || '').trim());
   if (!name) throw new Error('Funder name is required');
-  // Check for duplicate (case-insensitive)
-  const existing = await FundersModel.findOne({ funderName: name });
-  if (existing) return existing; // Return existing instead of creating duplicate
-  const record = new FundersModel({ funderName: name });
+  const officeAcronym = data.officeAcronym || null;
+  // Check for duplicate within the same office
+  const existing = await FundersModel.findOne({ funderName: name, officeAcronym });
+  if (existing) return existing;
+  const record = new FundersModel({ funderName: name, officeAcronym });
   return await record.save();
 }
 
 export async function UpdateFunder(id, data) {
   const name = toTitleCase((data.funderName || '').trim());
   if (!name) throw new Error('Funder name is required');
-  // Check for duplicate (case-insensitive, excluding self)
-  const existing = await FundersModel.findOne({ funderName: name, _id: { $ne: id } });
-  if (existing) throw new Error('A funder with this name already exists');
-  return await FundersModel.findByIdAndUpdate(id, { funderName: name }, { returnDocument: 'after' });
+  const updateData = { funderName: name };
+  if (data.officeAcronym !== undefined) updateData.officeAcronym = data.officeAcronym;
+  // Check for duplicate within the same office (excluding self)
+  const current = await FundersModel.findById(id);
+  const officeAcronym = data.officeAcronym !== undefined ? data.officeAcronym : current?.officeAcronym;
+  const existing = await FundersModel.findOne({ funderName: name, officeAcronym, _id: { $ne: id } });
+  if (existing) throw new Error('A funder with this name already exists for this office');
+  return await FundersModel.findByIdAndUpdate(id, updateData, { returnDocument: 'after' });
 }
 
 export async function DeleteFunder(id) {

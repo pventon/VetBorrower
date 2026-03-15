@@ -24,19 +24,22 @@ import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Get all funders
+// Get funders (optionally filtered by officeAcronym query param)
 router.get('/api/funder', authenticateToken, async (req, res) => {
   try {
-    const records = await GetAllFunders();
+    const filter = req.query.officeAcronym ? { officeAcronym: req.query.officeAcronym } : {};
+    const records = await GetAllFunders(filter);
     res.json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Add a funder (title-cased, de-duped)
+// Add a funder (title-cased, de-duped, office assigned)
 router.post('/api/funder', authenticateToken, async (req, res) => {
   try {
+    // If no officeAcronym provided, use the authenticated user's office
+    if (!req.body.officeAcronym) req.body.officeAcronym = req.user.officeAcronym;
     const record = await AddFunder(req.body);
     res.status(201).json(record);
   } catch (error) {

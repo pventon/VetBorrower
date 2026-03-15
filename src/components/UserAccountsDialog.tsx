@@ -102,7 +102,7 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
 
     const startAdd = () => {
         setEditingUser(null);
-        setFormData(emptyForm);
+        setFormData({ ...emptyForm, officeAcronym: isRoot ? "" : (currentUser?.officeAcronym ?? "") });
         setFormError(null);
         setIsAdding(true);
     };
@@ -116,7 +116,7 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
             firstName: user.firstName,
             lastName: user.lastName,
             role: user.role,
-            officeAcronym: user.officeAcronym ?? "",
+            officeAcronym: isRoot ? (user.officeAcronym ?? "") : (currentUser?.officeAcronym ?? ""),
             isActive: user.isActive,
         });
         setFormError(null);
@@ -243,18 +243,20 @@ export default function UserAccountsDialog({ onClose }: UserAccountsDialogProps)
                     ))}
                 </select>
             </div>
-            <div className="form-row">
-                <label>Office</label>
-                <select
-                    value={formData.officeAcronym}
-                    onChange={(e) => setFormData({ ...formData, officeAcronym: e.target.value })}
-                >
-                    <option value="">-- Select Office --</option>
-                    {officeAcronyms.map((a) => (
-                        <option key={a} value={a}>{a}</option>
-                    ))}
-                </select>
-            </div>
+            {isRoot && (
+                <div className="form-row">
+                    <label>Office</label>
+                    <select
+                        value={formData.officeAcronym}
+                        onChange={(e) => setFormData({ ...formData, officeAcronym: e.target.value })}
+                    >
+                        <option value="">-- Select Office --</option>
+                        {officeAcronyms.map((a) => (
+                            <option key={a} value={a}>{a}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
             <div className="form-row">
                 <label className="checkbox-label">
                     <input

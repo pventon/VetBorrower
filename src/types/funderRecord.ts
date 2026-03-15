@@ -17,4 +17,5 @@
 export interface FunderRecord {
   _id: string;
   funderName: string;
+  officeAcronym: string;
 }
