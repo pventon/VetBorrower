@@ -435,6 +435,7 @@ main {
 
 .action-cell {
   white-space: nowrap;
+  text-align: right;
 }
 
 .action-cell .btn {
@@ -480,6 +481,11 @@ main {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0 1rem;
+}
+
+/* Negative value styling */
+.form-row input.negative-value {
+  color: #c62828 !important;
 }
 
 /* Position table inline edit inputs */

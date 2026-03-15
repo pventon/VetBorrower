@@ -127,6 +127,18 @@ function stripCommas(value: string): string {
     return value.replace(/,/g, "");
 }
 
+function isNegativeValue(value: string): boolean {
+    if (!value) return false;
+    const num = parseFloat(value.replace(/,/g, ""));
+    return !isNaN(num) && num < 0;
+}
+
+/** Read-only input that shows red text when the value is negative */
+function ReadOnlyInput({ value, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+    const strVal = (value ?? "") as string;
+    return <input type="text" {...props} value={strVal} disabled className={isNegativeValue(strVal) ? "negative-value" : ""} />;
+}
+
 function formatDate(value: string | undefined): string {
     if (!value) return "-";
     return new Date(value).toLocaleDateString("en-US");
@@ -586,7 +598,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 const pb = (d.fundedAmount || 0) * (d.factorRate || 0);
                 return s + pb + (d.miscellaneousFees || 0) + (d.miscellaneousExpenses || 0) - (d.discount || 0);
             }, 0);
-            const totalCollected = chain.reduce((s, d) => s + (d.amountPaidIn || 0) + (d.settledByRenewal || 0), 0);
+            const totalCollected = chain.reduce((s, d) => s + (d.amountPaidIn || 0), 0);
             const netNewCap = chain.reduce((s, d) => s + (!d.parentDealId ? (d.fundedAmount || 0) : (d.fundedAmount || 0) - (d.rolledBalance || 0)), 0);
             const totalNetNewCashOut = chain.reduce((s, d) => {
                 const netFunded = d.netFundedAmount || ((d.fundedAmount || 0) - (d.originationFee || 0));
@@ -745,21 +757,21 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <div style={{ display: "flex", gap: "0.4rem" }}>
                             <div className="input-prefixed" style={{ flex: 1 }}>
                                 <span className="input-prefix-symbol">$</span>
-                                <input type="text" value={(() => {
+                                <ReadOnlyInput value={(() => {
                                     const freqMultiplier = (freq: string) => freq === "Daily" ? 20 : freq === "Bi-Weekly" ? 10 : freq === "Weekly" ? 4 : 1;
                                     const total = positions.filter(p => p.status).reduce((sum, p) => sum + (p.monthlyPaymentAmount || 0) * freqMultiplier(p.frequency), 0);
                                     return total > 0 ? formatDollar(total.toFixed(2)) : "";
-                                })()} disabled />
+                                })()} />
                             </div>
                             <div className="input-prefixed" style={{ flex: 1 }}>
                                 <span className="input-prefix-symbol">%</span>
-                                <input type="text" value={(() => {
+                                <ReadOnlyInput value={(() => {
                                     const freqMultiplier = (freq: string) => freq === "Daily" ? 20 : freq === "Bi-Weekly" ? 10 : freq === "Weekly" ? 4 : 1;
                                     const total = positions.filter(p => p.status).reduce((sum, p) => sum + (p.monthlyPaymentAmount || 0) * freqMultiplier(p.frequency), 0);
                                     const revNum = parseFloat(stripCommas(formData.grossMonthlyRevenue)) || 0;
                                     if (total <= 0 || revNum <= 0) return "";
                                     return ((total / revNum) * 100).toFixed(2);
-                                })()} disabled />
+                                })()} />
                             </div>
                         </div>
                     </div>
@@ -768,22 +780,22 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <div style={{ display: "flex", gap: "0.4rem" }}>
                             <div className="input-prefixed" style={{ flex: 1 }}>
                                 <span className="input-prefix-symbol">$</span>
-                                <input type="text" value={(() => {
+                                <ReadOnlyInput value={(() => {
                                     const pmtAmt = parseFloat(stripCommas(formData.paymentAmount)) || 0;
                                     if (pmtAmt <= 0) return "";
                                     const monthly = formData.weeklyOrDailyPayment === "true" ? pmtAmt * (52 / 12) : pmtAmt * (260 / 12);
                                     return formatDollar(monthly.toFixed(2));
-                                })()} disabled />
+                                })()} />
                             </div>
                             <div className="input-prefixed" style={{ flex: 1 }}>
                                 <span className="input-prefix-symbol">%</span>
-                                <input type="text" value={(() => {
+                                <ReadOnlyInput value={(() => {
                                     const pmtAmt = parseFloat(stripCommas(formData.paymentAmount)) || 0;
                                     const revNum = parseFloat(stripCommas(formData.grossMonthlyRevenue)) || 0;
                                     if (pmtAmt <= 0 || revNum <= 0) return "";
                                     const monthly = formData.weeklyOrDailyPayment === "true" ? pmtAmt * (52 / 12) : pmtAmt * (260 / 12);
                                     return ((monthly / revNum) * 100).toFixed(2);
-                                })()} disabled />
+                                })()} />
                             </div>
                         </div>
                     </div>
@@ -792,18 +804,18 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <div style={{ display: "flex", gap: "0.4rem" }}>
                             <div className="input-prefixed" style={{ flex: 1 }}>
                                 <span className="input-prefix-symbol">$</span>
-                                <input type="text" value={(() => {
+                                <ReadOnlyInput value={(() => {
                                     const freqMultiplier = (freq: string) => freq === "Daily" ? 20 : freq === "Bi-Weekly" ? 10 : freq === "Weekly" ? 4 : 1;
                                     const existing = positions.filter(p => p.status).reduce((sum, p) => sum + (p.monthlyPaymentAmount || 0) * freqMultiplier(p.frequency), 0);
                                     const pmtAmt = parseFloat(stripCommas(formData.paymentAmount)) || 0;
                                     const thisDealMonthly = formData.weeklyOrDailyPayment === "true" ? pmtAmt * (52 / 12) : pmtAmt * (260 / 12);
                                     const total = existing + thisDealMonthly;
                                     return total > 0 ? formatDollar(total.toFixed(2)) : "";
-                                })()} disabled />
+                                })()} />
                             </div>
                             <div className="input-prefixed" style={{ flex: 1 }}>
                                 <span className="input-prefix-symbol">%</span>
-                                <input type="text" value={(() => {
+                                <ReadOnlyInput value={(() => {
                                     const freqMultiplier = (freq: string) => freq === "Daily" ? 20 : freq === "Bi-Weekly" ? 10 : freq === "Weekly" ? 4 : 1;
                                     const existing = positions.filter(p => p.status).reduce((sum, p) => sum + (p.monthlyPaymentAmount || 0) * freqMultiplier(p.frequency), 0);
                                     const pmtAmt = parseFloat(stripCommas(formData.paymentAmount)) || 0;
@@ -812,7 +824,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     const revNum = parseFloat(stripCommas(formData.grossMonthlyRevenue)) || 0;
                                     if (total <= 0 || revNum <= 0) return "";
                                     return ((total / revNum) * 100).toFixed(2);
-                                })()} disabled />
+                                })()} />
                             </div>
                         </div>
                     </div>
@@ -913,7 +925,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <label>Net Funded Amount</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
-                            <input type="text" value={formatDollar(formData.netFundedAmount)} disabled />
+                            <ReadOnlyInput value={formatDollar(formData.netFundedAmount)} />
                         </div>
                     </div>
                 </div>
@@ -959,12 +971,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <label>Broker Commission</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
-                            <input type="text" value={formatDollar(formData.brokerCommission)} disabled />
+                            <ReadOnlyInput value={formatDollar(formData.brokerCommission)} />
                         </div>
                     </div>
                     <div className="form-row" title="Calculated: Buy Rate + (Broker Fee / 100)">
                         <label>Factor Rate</label>
-                        <input type="number" step="0.01" value={formData.factorRate} disabled />
+                        <ReadOnlyInput value={formData.factorRate} />
                     </div>
                     <div className="form-row" title="How often payments are made: Daily or Weekly">
                         <label>Payment Frequency</label>
@@ -994,14 +1006,14 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <label>Payment Amount</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
-                            <input type="text" value={formatDollar(formData.paymentAmount)} disabled />
+                            <ReadOnlyInput value={formatDollar(formData.paymentAmount)} />
                         </div>
                     </div>
                     <div className="form-row" title="Calculated: Funded Amount x Factor Rate">
                         <label>Total Payback</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
-                            <input type="text" value={formatDollar(formData.totalPaybackAmount)} disabled />
+                            <ReadOnlyInput value={formatDollar(formData.totalPaybackAmount)} />
                         </div>
                     </div>
                 </div>
@@ -1048,27 +1060,27 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <label>Total Cash Out</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
-                            <input type="text" value={(() => {
+                            <ReadOnlyInput value={(() => {
                                 const net = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
                                 const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
                                 const misc = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
                                 const total = net + comm + misc;
                                 return total > 0 ? formatDollar(total.toFixed(2)) : "";
-                            })()} disabled />
+                            })()} />
                         </div>
                     </div>
                     <div className="form-row" title="Calculated: Total Payback + Miscellaneous Fees + Miscellaneous Expenses - Discount">
                         <label>Total Payback w/ Fees &amp; Expenses</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
-                            <input type="text" value={(() => {
+                            <ReadOnlyInput value={(() => {
                                 const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
                                 const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
                                 const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
                                 const disc = parseFloat(stripCommas(formData.discount)) || 0;
                                 const total = payback + fees + expenses - disc;
                                 return total > 0 ? formatDollar(total.toFixed(2)) : "";
-                            })()} disabled />
+                            })()} />
                         </div>
                     </div>
                 </div>
@@ -1093,48 +1105,45 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <label>Settled by Renewal</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
-                            <input type="text" value={formData.settledByRenewal ? formatDollar(formData.settledByRenewal) : ""} disabled />
+                            <ReadOnlyInput value={formData.settledByRenewal ? formatDollar(formData.settledByRenewal) : ""} />
                         </div>
                     </div>
-                    <div className="form-row" title="Calculated: Total Payback w/ Fees & Expenses - Amount Paid In - Settled by Renewal">
+                    <div className="form-row" title="Calculated: Total Payback w/ Fees & Expenses - Amount Paid In">
                         <label>Outstanding Amount Owed</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
-                            <input type="text" value={(() => {
+                            <ReadOnlyInput value={(() => {
                                 const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
                                 const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
                                 const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
                                 const disc = parseFloat(stripCommas(formData.discount)) || 0;
                                 const totalWithFees = payback + fees + expenses - disc;
                                 const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
-                                const settled = parseFloat(stripCommas(formData.settledByRenewal)) || 0;
-                                const owed = totalWithFees - paidIn - settled;
+                                const owed = totalWithFees - paidIn;
                                 return totalWithFees > 0 ? formatDollar((owed > 0 ? owed : 0).toFixed(2)) : "";
-                            })()} disabled />
+                            })()} />
                         </div>
                     </div>
-                    <div className="form-row" title="Calculated: (Amount Paid In + Settled by Renewal) - Total Cash Out">
+                    <div className="form-row" title="Calculated: Amount Paid In - Total Cash Out">
                         <label>Net Profit</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
-                            <input type="text" value={(() => {
+                            <ReadOnlyInput value={(() => {
                                 const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
-                                const settled = parseFloat(stripCommas(formData.settledByRenewal)) || 0;
                                 const net = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
                                 const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
                                 const misc = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
                                 const totalCashOut = net + comm + misc;
-                                const totalReceived = paidIn + settled;
-                                if (totalReceived <= 0 && totalCashOut <= 0) return "";
-                                return formatDollar((totalReceived - totalCashOut).toFixed(2));
-                            })()} disabled />
+                                if (paidIn <= 0 && totalCashOut <= 0) return "";
+                                return formatDollar((paidIn - totalCashOut).toFixed(2));
+                            })()} />
                         </div>
                     </div>
                     <div className="form-row" title="Calculated: (Total Payback w/ Fees & Expenses - Total Cash Out) / Total Cash Out x 100">
                         <label>Expected ROI</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">%</span>
-                            <input type="text" value={(() => {
+                            <ReadOnlyInput value={(() => {
                                 const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
                                 const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
                                 const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
@@ -1145,22 +1154,22 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 const totalCashOut = netFunded + comm + expenses;
                                 if (totalCashOut <= 0) return "";
                                 return ((totalWithFees - totalCashOut) / totalCashOut * 100).toFixed(2);
-                            })()} disabled />
+                            })()} />
                         </div>
                     </div>
-                    <div className="form-row" title="Calculated: ((Amount Paid In + Settled by Renewal) - Total Cash Out) / Total Cash Out x 100">
+                    <div className="form-row" title="Calculated: (Amount Paid In - Total Cash Out) / Total Cash Out x 100">
                         <label>Current ROI</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">%</span>
-                            <input type="text" value={(() => {
-                                const paidIn = (parseFloat(stripCommas(formData.amountPaidIn)) || 0) + (parseFloat(stripCommas(formData.settledByRenewal)) || 0);
+                            <ReadOnlyInput value={(() => {
+                                const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
                                 const netFunded = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
                                 const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
                                 const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
                                 const totalCashOut = netFunded + comm + expenses;
                                 if (totalCashOut <= 0) return "";
                                 return ((paidIn - totalCashOut) / totalCashOut * 100).toFixed(2);
-                            })()} disabled />
+                            })()} />
                         </div>
                     </div>
                 </div>
@@ -1252,26 +1261,26 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 <label>Net New Cash Out</label>
                                 <div className="input-prefixed">
                                     <span className="input-prefix-symbol">$</span>
-                                    <input type="text" value={(() => {
+                                    <ReadOnlyInput value={(() => {
                                         const netFunded = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
                                         const rolled = parseFloat(stripCommas(formData.rolledBalance)) || 0;
                                         const netNew = netFunded - rolled;
                                         return netFunded > 0 ? formatDollar((netNew > 0 ? netNew : 0).toFixed(2)) : "";
-                                    })()} disabled />
+                                    })()} />
                                 </div>
                             </div>
                             <div className="form-row" title="Calculated: Net New Cash Out + Broker Commission">
                                 <label>Total Net New Cash Out</label>
                                 <div className="input-prefixed">
                                     <span className="input-prefix-symbol">$</span>
-                                    <input type="text" value={(() => {
+                                    <ReadOnlyInput value={(() => {
                                         const netFunded = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
                                         const rolled = parseFloat(stripCommas(formData.rolledBalance)) || 0;
                                         const netNew = netFunded - rolled;
                                         const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
                                         const total = (netNew > 0 ? netNew : 0) + comm;
                                         return total > 0 ? formatDollar(total.toFixed(2)) : "";
-                                    })()} disabled />
+                                    })()} />
                                 </div>
                             </div>
                 </div>
@@ -1397,7 +1406,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
                 const compoundTotalFunded = chain.reduce((s, d) => s + (d.fundedAmount || 0), 0);
                 const compoundTotalPayback = chain.reduce((s, d) => s + calcDealTotalPaybackWithFees(d), 0);
-                const compoundTotalCollected = chain.reduce((s, d) => s + (d.amountPaidIn || 0) + (d.settledByRenewal || 0), 0);
+                const compoundTotalPaidIn = chain.reduce((s, d) => s + (d.amountPaidIn || 0), 0);
+                const compoundTotalCollected = compoundTotalPaidIn;
                 const compoundNetNewCapital = chain.reduce((s, d) => s + calcDealNetNewCapital(d), 0);
                 const compoundTotalNetNewCashOut = chain.reduce((s, d) => s + calcDealTotalNetNewCashOut(d), 0);
                 const compoundExpectedProfit = compoundTotalPayback - compoundTotalNetNewCashOut;
@@ -1425,6 +1435,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     <th>Net New Capital</th>
                                     <th>Total Payback</th>
                                     <th>Paid In</th>
+                                    <th>Rolled Over</th>
+                                    <th>Outstanding</th>
                                     <th>Profit</th>
                                     <th>Status</th>
                                 </tr>
@@ -1433,8 +1445,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 {chain.map((d) => {
                                     const totalPB = calcDealTotalPaybackWithFees(d);
                                     const netNew = calcDealNetNewCapital(d);
-                                    const totalReceived = (d.amountPaidIn || 0) + (d.settledByRenewal || 0);
-                                    const profit = totalReceived - (d.fundedAmount || 0);
+                                    const paidIn = d.amountPaidIn || 0;
+                                    const settled = d.settledByRenewal || 0;
+                                    const outstanding = totalPB - paidIn;
+                                    const profit = paidIn - (d.fundedAmount || 0);
                                     const isCurrent = d._id === currentId;
                                     return (
                                         <tr key={d._id} className={isCurrent ? "ledger-current" : ""}>
@@ -1444,30 +1458,52 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             <td>{d.rolledBalance ? formatCurrency(d.rolledBalance) : "-"}</td>
                                             <td>{formatCurrency(netNew)}</td>
                                             <td>{formatCurrency(totalPB)}</td>
-                                            <td>{formatCurrency(totalReceived)}</td>
+                                            <td>{formatCurrency(paidIn)}</td>
+                                            <td>{settled ? formatCurrency(settled) : "-"}</td>
+                                            <td style={{ color: outstanding > 0 ? "#c62828" : undefined }}>{formatCurrency(outstanding > 0 ? outstanding : 0)}</td>
                                             <td style={{ color: profit >= 0 ? "#2e7d32" : "#c62828" }}>{formatCurrency(profit)}</td>
                                             <td style={{ textTransform: "capitalize" }}>{d.dealState ?? "-"}</td>
                                         </tr>
                                     );
                                 })}
                                 {(() => {
-                                    const totalLedgerProfit = chain.reduce((s, d) => {
-                                        const received = (d.amountPaidIn || 0) + (d.settledByRenewal || 0);
-                                        return s + (received - (d.fundedAmount || 0));
-                                    }, 0);
+                                    const totalLedgerProfit = chain.reduce((s, d) => s + ((d.amountPaidIn || 0) - (d.fundedAmount || 0)), 0);
                                     const totalRolledBalance = chain.reduce((s, d) => s + (d.rolledBalance || 0), 0);
+                                    const totalSettled = chain.reduce((s, d) => s + (d.settledByRenewal || 0), 0);
+                                    const totalOutstanding = chain.reduce((s, d) => {
+                                        const owed = calcDealTotalPaybackWithFees(d) - (d.amountPaidIn || 0);
+                                        return s + (owed > 0 ? owed : 0);
+                                    }, 0);
+                                    const capitalRecovery = totalRolledBalance;
+                                    const adjustedProfit = totalLedgerProfit + capitalRecovery;
                                     return (
+                                        <>
                                         <tr className="ledger-totals">
-                                            <td style={{ textAlign: "left" }}>Totals</td>
+                                            <td style={{ textAlign: "left" }}>Totals (per deal)</td>
                                             <td></td>
                                             <td>{formatCurrency(compoundTotalFunded)}</td>
                                             <td>{formatCurrency(totalRolledBalance)}</td>
                                             <td>{formatCurrency(compoundNetNewCapital)}</td>
                                             <td>{formatCurrency(compoundTotalPayback)}</td>
-                                            <td>{formatCurrency(compoundTotalCollected)}</td>
+                                            <td>{formatCurrency(compoundTotalPaidIn)}</td>
+                                            <td>{formatCurrency(totalSettled)}</td>
+                                            <td style={{ color: totalOutstanding > 0 ? "#c62828" : undefined }}>{formatCurrency(totalOutstanding)}</td>
                                             <td style={{ color: totalLedgerProfit >= 0 ? "#2e7d32" : "#c62828" }}>{formatCurrency(totalLedgerProfit)}</td>
                                             <td></td>
                                         </tr>
+                                        <tr className="ledger-totals" style={{ borderTop: "1px solid #7a8fa6" }}>
+                                            <td style={{ textAlign: "left" }} colSpan={8}>Capital recovered via renewals (rolled balance recycled)</td>
+                                            <td></td>
+                                            <td style={{ color: "#2e7d32" }}>+{formatCurrency(capitalRecovery)}</td>
+                                            <td></td>
+                                        </tr>
+                                        <tr className="ledger-totals" style={{ background: "#e3edf7" }}>
+                                            <td style={{ textAlign: "left" }} colSpan={8}><strong>Adjusted Compound Profit</strong></td>
+                                            <td></td>
+                                            <td style={{ color: adjustedProfit >= 0 ? "#2e7d32" : "#c62828" }}><strong>{formatCurrency(adjustedProfit)}</strong></td>
+                                            <td></td>
+                                        </tr>
+                                        </>
                                     );
                                 })()}
                             </tbody>
@@ -1621,16 +1657,20 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <table className="dialog-table" style={{ marginTop: "1rem" }}>
                             <thead>
                                 <tr>
-                                    <th>ID</th>
+                                    <th style={{ textAlign: "center" }}>ID</th>
                                     <th style={{ textAlign: "center" }}>Broker</th>
                                     <th style={{ textAlign: "center" }}>Type</th>
                                     <th style={{ textAlign: "center" }}>State</th>
-                                    <th style={{ textAlign: "center" }}>Funded Date</th>
-                                    <th style={{ textAlign: "right" }}>Funded Amount</th>
-                                    <th style={{ textAlign: "right" }}>Net Funded</th>
-                                    <th style={{ textAlign: "center" }}>Term (days)</th>
-                                    <th style={{ textAlign: "center" }}>Factor Rate</th>
-                                    <th style={{ textAlign: "right" }}>Total Payback</th>
+                                    <th style={{ textAlign: "center" }}>Funded<br/>Date</th>
+                                    <th style={{ textAlign: "center" }}>Funded<br/>Amount</th>
+                                    <th style={{ textAlign: "center" }}>Net<br/>Funded</th>
+                                    <th style={{ textAlign: "center" }}>Term<br/>(days)</th>
+                                    <th style={{ textAlign: "center" }}>Factor<br/>Rate</th>
+                                    <th style={{ textAlign: "center" }}>Total<br/>Payback</th>
+                                    <th style={{ textAlign: "center" }}>Rx'd to<br/>Date</th>
+                                    <th style={{ textAlign: "center" }}>Outstanding</th>
+                                    <th style={{ textAlign: "center" }}>Expected<br/>ROI</th>
+                                    <th style={{ textAlign: "center" }}>Current<br/>ROI</th>
                                     <th style={{ textAlign: "center" }}>Actions</th>
                                 </tr>
                             </thead>
@@ -1649,6 +1689,29 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         <td style={{ textAlign: "center" }}>{deal.loanTerm ?? "-"}</td>
                                         <td style={{ textAlign: "center" }}>{deal.factorRate ?? "-"}</td>
                                         <td style={{ textAlign: "right" }}>{formatCurrency(deal.totalPaybackAmount)}</td>
+                                        <td style={{ textAlign: "right" }}>{formatCurrency(deal.amountPaidIn)}</td>
+                                        {(() => {
+                                            const payback = (deal.fundedAmount || 0) * (deal.factorRate || 0) + (deal.miscellaneousFees || 0) + (deal.miscellaneousExpenses || 0) - (deal.discount || 0);
+                                            const outstanding = payback - (deal.amountPaidIn || 0);
+                                            const val = outstanding > 0 ? outstanding : 0;
+                                            return <td style={{ textAlign: "right", color: val > 0 ? "#c62828" : undefined }}>{formatCurrency(val)}</td>;
+                                        })()}
+                                        {(() => {
+                                            const netFunded = deal.netFundedAmount || ((deal.fundedAmount || 0) - (deal.originationFee || 0));
+                                            const comm = deal.brokerCommission || ((deal.brokerFee || 0) / 100 * (deal.fundedAmount || 0));
+                                            const expenses = deal.miscellaneousExpenses || 0;
+                                            const totalCashOut = netFunded + comm + expenses;
+                                            const payback = (deal.fundedAmount || 0) * (deal.factorRate || 0) + (deal.miscellaneousFees || 0) + expenses - (deal.discount || 0);
+                                            const expectedRoi = totalCashOut > 0 ? ((payback - totalCashOut) / totalCashOut * 100) : 0;
+                                            const paidIn = deal.amountPaidIn || 0;
+                                            const currentRoi = totalCashOut > 0 ? ((paidIn - totalCashOut) / totalCashOut * 100) : 0;
+                                            return (
+                                                <>
+                                                    <td style={{ textAlign: "center", color: expectedRoi < 0 ? "#c62828" : undefined }}>{expectedRoi !== 0 ? expectedRoi.toFixed(2) + "%" : "-"}</td>
+                                                    <td style={{ textAlign: "center", color: currentRoi < 0 ? "#c62828" : undefined }}>{currentRoi !== 0 ? currentRoi.toFixed(2) + "%" : "-"}</td>
+                                                </>
+                                            );
+                                        })()}
                                         <td className="action-cell">
                                             <button className="btn btn-sm btn-success" onClick={() => startEdit(deal)} disabled={isAdding || showForm}>Edit</button>
                                             <button className="btn btn-sm btn-danger" onClick={() => handleDelete(deal)} disabled={isAdding || showForm || !!deal.renewalDealId}>Delete</button>
@@ -1657,7 +1720,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     </tr>
                                 ))}
                                 {deals.length === 0 && (
-                                    <tr><td colSpan={11} className="empty-row">No deals found for this corporation</td></tr>
+                                    <tr><td colSpan={15} className="empty-row">No deals found for this corporation</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -1721,64 +1784,73 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     </div>
                     <div className="dialog-body" style={{ fontSize: "0.88rem", lineHeight: 1.6 }}>
                         <h3 style={{ color: "#2c3e50", marginBottom: "0.5rem" }}>Overview</h3>
-                        <p>When a deal is renewed, the compound performance section aggregates financial data across the entire renewal chain — from the original deal through every subsequent renewal.</p>
+                        <p>The compound performance section aggregates financial data across the entire renewal chain. Each deal shows its <strong>actual state</strong> — what the client paid vs what was funded — without artificially settling amounts via renewals.</p>
 
                         <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>The Ledger Table</h3>
-                        <p>Each row represents one deal in the chain:</p>
+                        <p>Each row shows one deal in the chain:</p>
                         <ul style={{ marginLeft: "1.5rem", marginBottom: "0.5rem" }}>
                             <li><strong>Funded</strong> — Total amount funded for that deal</li>
-                            <li><strong>Rolled Balance</strong> — Amount from the renewal used to pay off the previous deal's outstanding balance</li>
-                            <li><strong>Net New Capital</strong> — For the original deal: the full Funded Amount. For renewals: Funded Amount − Rolled Balance</li>
-                            <li><strong>Total Payback</strong> — (Funded Amount × Factor Rate) + Misc Fees + Misc Expenses − Discount</li>
-                            <li><strong>Paid In</strong> — Total amount received: Amount Paid In + Settled by Renewal</li>
-                            <li><strong>Profit</strong> — Paid In − Funded Amount (per-deal profit)</li>
+                            <li><strong>Rolled Balance</strong> — Amount from the renewal used to cover the previous deal's outstanding balance</li>
+                            <li><strong>Net New Capital</strong> — For the original deal: full Funded Amount. For renewals: Funded − Rolled Balance</li>
+                            <li><strong>Total Payback</strong> — (Funded × Factor Rate) + Misc Fees + Misc Expenses − Discount</li>
+                            <li><strong>Paid In</strong> — Actual client payments received on this deal only</li>
+                            <li><strong>Rolled Over</strong> — The amount that was rolled over when this deal was renewed (Settled by Renewal value)</li>
+                            <li><strong>Outstanding</strong> — Total Payback − Paid In (what the client still owes on this deal)</li>
+                            <li><strong>Profit</strong> — Paid In − Funded Amount (actual per-deal profit/loss based on client payments only)</li>
                         </ul>
-                        <p>The <strong>Totals</strong> row sums each column across all deals in the chain. The Totals Profit is the sum of individual deal profits.</p>
 
-                        <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Key Definitions</h3>
-                        <ul style={{ marginLeft: "1.5rem", marginBottom: "0.5rem" }}>
-                            <li><strong>Total Net New Cash Out</strong> (per deal) = Net New Cash Out + Broker Commission. For the original deal, Net New Cash Out = Net Funded Amount. For renewals, Net New Cash Out = Net Funded Amount − Rolled Balance.</li>
-                            <li><strong>Settled by Renewal</strong> — When a deal is renewed, the renewal's Rolled Balance settles the previous deal's outstanding amount. This is added to the previous deal's Paid In.</li>
+                        <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Understanding Per-Deal Loss and Capital Recovery</h3>
+                        <p>When a deal is renewed before the client has paid back the full funded amount, the per-deal profit will show a <strong style={{ color: "#c62828" }}>loss</strong>. This is correct — it reflects that the client did not fully repay that deal.</p>
+                        <p style={{ marginTop: "0.5rem" }}>However, this loss is <strong>recovered through capital recycling</strong>. The rolled balance from the renewal means the next deal requires less new capital. The ledger shows:</p>
+                        <ul style={{ marginLeft: "1.5rem" }}>
+                            <li><strong>Totals (per deal)</strong> — Sum of individual deal profits. May show a loss because each deal's profit is measured against its full Funded Amount.</li>
+                            <li><strong>Capital recovered via renewals</strong> — The total rolled balance across all renewals. This capital was recycled, not lost. It reduces the actual new money deployed.</li>
+                            <li><strong>Adjusted Compound Profit</strong> — Totals Profit + Capital Recovered. This bridges the gap to show the true economic outcome.</li>
                         </ul>
 
                         <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Compound Metrics</h3>
-                        <p>These metrics use Total Net New Cash Out (summed across the chain) as the cost basis, representing the actual money disbursed.</p>
+                        <p>These use Total Net New Cash Out (actual cash disbursed) as the cost basis.</p>
+
+                        <p style={{ marginTop: "0.5rem" }}><strong>Total Net New Cash Out</strong> (per deal) = Net New Cash Out + Broker Commission</p>
+                        <p style={{ marginLeft: "1rem", fontSize: "0.82rem", color: "#777" }}>For the original deal, Net New Cash Out = Net Funded Amount. For renewals: Net Funded − Rolled Balance.</p>
 
                         <p style={{ marginTop: "0.5rem" }}><strong>Expected ROI (on Cash Out)</strong></p>
                         <p style={{ marginLeft: "1rem", color: "#555" }}>= (Total Expected Payback − Total Net New Cash Out) / Total Net New Cash Out × 100</p>
 
                         <p style={{ marginTop: "0.5rem" }}><strong>Expected ROI (on Net Capital)</strong></p>
                         <p style={{ marginLeft: "1rem", color: "#555" }}>= (Total Expected Payback − Total Net New Cash Out) / Total Net New Capital × 100</p>
-                        <p style={{ marginLeft: "1rem", fontSize: "0.82rem", color: "#777" }}>Net New Capital is lower than Total Net New Cash Out because it excludes broker commissions and origination fees. Each renewal further reduces it via the rolled balance, driving this ROI higher with each renewal.</p>
 
                         <p style={{ marginTop: "0.5rem" }}><strong>Current ROI (on Cash Out / Net Capital)</strong></p>
-                        <p style={{ marginLeft: "1rem", color: "#555" }}>Same formulas as above but using actual Total Collected (Amount Paid In + Settled by Renewal across all deals) instead of expected payback.</p>
+                        <p style={{ marginLeft: "1rem", color: "#555" }}>Same formulas but using actual Total Paid In (client payments only, no settled amounts) instead of expected payback.</p>
 
                         <p style={{ marginTop: "0.5rem" }}><strong>Expected / Current Compound Profit</strong></p>
-                        <p style={{ marginLeft: "1rem", color: "#555" }}>= Total Expected Payback (or Total Collected) − Total Net New Cash Out</p>
-                        <p style={{ marginLeft: "1rem", fontSize: "0.82rem", color: "#777" }}>Note: Compound Profit differs from the Ledger Totals Profit because it uses Total Net New Cash Out as the cost basis (actual cash disbursed) rather than the Funded Amount.</p>
-
-                        <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Why ROI Improves With Renewals</h3>
-                        <p>Each renewal funds a new deal, but part of that money (the rolled balance) pays off the previous deal:</p>
-                        <ul style={{ marginLeft: "1.5rem" }}>
-                            <li>The previous deal is fully satisfied — all payback collected via client payments + settled by renewal</li>
-                            <li>The new deal only requires (Net Funded Amount − Rolled Balance) of truly new capital</li>
-                            <li>The borrower owes the full payback amount on the new funded amount</li>
-                            <li>Less new money at risk per renewal, same return — compounding ROI on net capital</li>
-                        </ul>
+                        <p style={{ marginLeft: "1rem", color: "#555" }}>= Total Payback (or Total Paid In) − Total Net New Cash Out</p>
 
                         <h3 style={{ color: "#2c3e50", marginTop: "1rem", marginBottom: "0.5rem" }}>Example</h3>
                         <p>Deal 1: Fund $10,000, Origination Fee 5% ($500), Net Funded $9,500, Broker Commission $1,000, Factor Rate 1.35.</p>
                         <p>Total Payback = $13,500. Total Net New Cash Out = $9,500 + $1,000 = $10,500.</p>
-                        <p>Client pays 50% ($6,750). Outstanding = $6,750.</p>
-                        <p style={{ marginTop: "0.5rem" }}>Deal 2 (renewal): Fund $10,000, same terms. Rolled Balance = $6,750.</p>
-                        <p>Net New Cash Out = $9,500 − $6,750 = $2,750. Total Net New Cash Out = $2,750 + $1,000 = $3,750.</p>
-                        <p>Deal 1 is settled: Paid In = $6,750 (client) + $6,750 (settled by renewal) = $13,500.</p>
+                        <p>Client pays $5,000 then deal is renewed. Outstanding = $8,500.</p>
 
-                        <p style={{ marginTop: "0.5rem" }}><strong>Ledger Totals Profit:</strong> ($13,500 − $10,000) + ($13,500 − $10,000) = $7,000</p>
-                        <p><strong>Compound Profit:</strong> $27,000 − $14,250 = $12,750</p>
-                        <p><strong>Expected ROI (on Cash Out):</strong> $12,750 / $14,250 = 89.47%</p>
-                        <p><strong>Expected ROI (on Net Capital):</strong> $12,750 / $13,250 = 96.23%</p>
+                        <p style={{ marginTop: "0.5rem" }}>Deal 2 (renewal): Fund $10,000, same terms. Rolled Balance = $8,500.</p>
+                        <p>Net New Cash Out = $9,500 − $8,500 = $1,000. Total Net New Cash Out = $1,000 + $1,000 = $2,000.</p>
+                        <p>Client pays full $13,500.</p>
+
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "0.5rem", fontSize: "0.82rem" }}>
+                            <thead><tr style={{ borderBottom: "2px solid #3d5470" }}>
+                                <th style={{ textAlign: "left", padding: "0.3rem" }}>Deal</th><th style={{ textAlign: "right", padding: "0.3rem" }}>Funded</th><th style={{ textAlign: "right", padding: "0.3rem" }}>Paid In</th><th style={{ textAlign: "right", padding: "0.3rem" }}>Per-Deal Profit</th>
+                            </tr></thead>
+                            <tbody>
+                                <tr><td style={{ padding: "0.3rem" }}>Deal 1</td><td style={{ textAlign: "right", padding: "0.3rem" }}>$10,000</td><td style={{ textAlign: "right", padding: "0.3rem" }}>$5,000</td><td style={{ textAlign: "right", padding: "0.3rem", color: "#c62828" }}>-$5,000</td></tr>
+                                <tr><td style={{ padding: "0.3rem" }}>Deal 2</td><td style={{ textAlign: "right", padding: "0.3rem" }}>$10,000</td><td style={{ textAlign: "right", padding: "0.3rem" }}>$13,500</td><td style={{ textAlign: "right", padding: "0.3rem", color: "#2e7d32" }}>$3,500</td></tr>
+                                <tr style={{ borderTop: "2px solid #3d5470", fontWeight: 700 }}><td style={{ padding: "0.3rem" }}>Totals</td><td style={{ textAlign: "right", padding: "0.3rem" }}>$20,000</td><td style={{ textAlign: "right", padding: "0.3rem" }}>$18,500</td><td style={{ textAlign: "right", padding: "0.3rem", color: "#c62828" }}>-$1,500</td></tr>
+                                <tr style={{ color: "#2e7d32" }}><td colSpan={3} style={{ padding: "0.3rem" }}>Capital recovered via renewal</td><td style={{ textAlign: "right", padding: "0.3rem" }}>+$8,500</td></tr>
+                                <tr style={{ fontWeight: 700, background: "#e3edf7" }}><td colSpan={3} style={{ padding: "0.3rem" }}>Adjusted Compound Profit</td><td style={{ textAlign: "right", padding: "0.3rem", color: "#2e7d32" }}>$7,000</td></tr>
+                            </tbody>
+                        </table>
+
+                        <p style={{ marginTop: "0.75rem" }}>Per-deal, we lost $1,500. But $8,500 of capital was recycled via the rolled balance, meaning we only deployed $12,500 of actual new money ($10,500 + $2,000) and received $18,500 back.</p>
+                        <p><strong>Current Compound Profit:</strong> $18,500 − $12,500 = $6,000</p>
+                        <p><strong>Current ROI (on Cash Out):</strong> $6,000 / $12,500 = 48%</p>
                     </div>
                     <div className="dialog-footer">
                         <button className="btn" onClick={() => setShowCompoundInfo(false)}>Close</button>
