@@ -54,8 +54,10 @@ export function deriveDealState(deal) {
     return 'dormant';
   }
 
-  // Completed — total payback is defined and amount paid in covers it
-  if (deal.totalPaybackAmount > 0 && deal.amountPaidIn >= deal.totalPaybackAmount) {
+  // Completed — total payback is defined and amount paid in (+ settled by renewal) covers it
+  const totalReceived = (deal.amountPaidIn || 0) + (deal.settledByRenewal || 0);
+  const totalPayback = deal.totalPaybackAmount || ((deal.fundedAmount || 0) * (deal.factorRate || 0));
+  if (totalPayback > 0 && totalReceived >= totalPayback) {
     return 'completed';
   }
 

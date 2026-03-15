@@ -1329,11 +1329,28 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     compoundExpectedRoi: 0, compoundExpectedRoiOnCapital: 0,
                     compoundCurrentRoi: 0, compoundCurrentRoiOnCapital: 0,
                     totalNetCashOut: 0,
-                    positions: [], dealState: "active",
+                    positions: [],
                     renewalDate: formData.renewalDate || "",
                     renewalDealId: editingDeal?.renewalDealId ?? null,
                     parentDealId: editingDeal?.parentDealId ?? renewingParentId,
                 } as DealRecord;
+
+                // Derive state for the virtual deal using the same rules as the server
+                const virtualTotalPayback = (currentDealFromForm.fundedAmount || 0) * (currentDealFromForm.factorRate || 0);
+                const virtualTotalReceived = (currentDealFromForm.amountPaidIn || 0) + (currentDealFromForm.settledByRenewal || 0);
+                if (currentDealFromForm.hasDefaulted) {
+                    currentDealFromForm.dealState = "default";
+                } else if (currentDealFromForm.renewalDealId) {
+                    currentDealFromForm.dealState = "renewed";
+                } else if (!currentDealFromForm.fundedDate) {
+                    currentDealFromForm.dealState = "dormant";
+                } else if (new Date(currentDealFromForm.fundedDate) > new Date()) {
+                    currentDealFromForm.dealState = "dormant";
+                } else if (virtualTotalPayback > 0 && virtualTotalReceived >= virtualTotalPayback) {
+                    currentDealFromForm.dealState = "completed";
+                } else {
+                    currentDealFromForm.dealState = "active";
+                }
 
                 // Build chain: walk up to root from parent, then append current
                 let chain: DealRecord[] = [];
