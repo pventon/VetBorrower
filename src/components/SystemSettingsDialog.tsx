@@ -17,6 +17,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
 import type { SettingsRecord, IndustryType, UsState, UserRole } from "../types/settingsRecord";
+import type { FunderRecord } from "../types/funderRecord";
 
 const API_BASE =
     import.meta.env.VITE_ENV_IS_TEST_ENV === "true"
@@ -27,7 +28,7 @@ interface SystemSettingsDialogProps {
     onClose: () => void;
 }
 
-type TabName = "general" | "industryTypes" | "usStates" | "userRoles";
+type TabName = "general" | "industryTypes" | "usStates" | "userRoles" | "funders";
 
 export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogProps) {
     const { token, hasRole } = useAuth();
@@ -46,6 +47,12 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
     const [usStates, setUsStates] = useState<UsState[]>([]);
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
 
+    // Funders (separate collection)
+    const [fundersList, setFundersList] = useState<FunderRecord[]>([]);
+    const [editingFunderId, setEditingFunderId] = useState<string | null>(null);
+    const [funderFormName, setFunderFormName] = useState("");
+    const [isAddingFunder, setIsAddingFunder] = useState(false);
+
     useEffect(() => {
         if (settings) {
             setServerPort(settings.serverPort);
@@ -56,6 +63,66 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
             setUserRoles([...settings.userRoles]);
         }
     }, [settings]);
+
+    const fetchFunders = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/funder`, { headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
+            if (res.ok) setFundersList(await res.json());
+        } catch { /* ignore */ }
+    };
+
+    useEffect(() => { fetchFunders(); }, []);
+
+    const handleAddFunder = async () => {
+        if (!funderFormName.trim()) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/funder`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ funderName: funderFormName }),
+            });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to add funder"); }
+            setFunderFormName("");
+            setIsAddingFunder(false);
+            await fetchFunders();
+            setSuccess("Funder added successfully.");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to add funder");
+        }
+    };
+
+    const handleUpdateFunder = async () => {
+        if (!editingFunderId || !funderFormName.trim()) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/funder/${editingFunderId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ funderName: funderFormName }),
+            });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to update funder"); }
+            setEditingFunderId(null);
+            setFunderFormName("");
+            await fetchFunders();
+            setSuccess("Funder updated successfully.");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to update funder");
+        }
+    };
+
+    const handleDeleteFunder = async (id: string) => {
+        if (!confirm("Delete this funder?")) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/funder/${id}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error("Failed to delete funder");
+            await fetchFunders();
+            setSuccess("Funder deleted successfully.");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to delete funder");
+        }
+    };
 
     const headers = {
         "Content-Type": "application/json",
@@ -129,6 +196,7 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
         ...(hasRole("root") ? [{ key: "general" as TabName, label: "General" }] : []),
         { key: "industryTypes", label: "Industry Types" },
         { key: "usStates", label: "US States" },
+        { key: "funders", label: "Funders" },
         ...(hasRole("root") ? [{ key: "userRoles" as TabName, label: "User Roles" }] : []),
     ];
 
@@ -257,6 +325,57 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
                                                 </td>
                                             </tr>
                                         ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {activeTab === "funders" && (
+                            <div>
+                                <button className="btn btn-sm" onClick={() => { setIsAddingFunder(true); setFunderFormName(""); }} disabled={isAddingFunder || editingFunderId !== null}>Add Funder</button>
+                                <table className="dialog-table settings-array-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Funder Name</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {fundersList.map((f) => (
+                                            editingFunderId === f._id ? (
+                                                <tr key={f._id}>
+                                                    <td>
+                                                        <input type="text" value={funderFormName} onChange={(e) => setFunderFormName(e.target.value)} style={{ width: "100%" }} />
+                                                    </td>
+                                                    <td>
+                                                        <button className="btn btn-sm btn-primary" onClick={handleUpdateFunder}>Save</button>
+                                                        <button className="btn btn-sm" onClick={() => { setEditingFunderId(null); setFunderFormName(""); }}>Cancel</button>
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                <tr key={f._id}>
+                                                    <td>{f.funderName}</td>
+                                                    <td>
+                                                        <button className="btn btn-sm btn-success" onClick={() => { setEditingFunderId(f._id); setFunderFormName(f.funderName); }} disabled={isAddingFunder || editingFunderId !== null}>Edit</button>
+                                                        <button className="btn btn-sm btn-danger" onClick={() => handleDeleteFunder(f._id)} disabled={isAddingFunder || editingFunderId !== null}>Delete</button>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        ))}
+                                        {isAddingFunder && (
+                                            <tr>
+                                                <td>
+                                                    <input type="text" placeholder="Enter funder name" value={funderFormName} onChange={(e) => setFunderFormName(e.target.value)} style={{ width: "100%" }} />
+                                                </td>
+                                                <td>
+                                                    <button className="btn btn-sm btn-primary" onClick={handleAddFunder}>Save</button>
+                                                    <button className="btn btn-sm" onClick={() => { setIsAddingFunder(false); setFunderFormName(""); }}>Cancel</button>
+                                                </td>
+                                            </tr>
+                                        )}
+                                        {fundersList.length === 0 && !isAddingFunder && (
+                                            <tr><td colSpan={2} className="empty-row">No funders configured</td></tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>

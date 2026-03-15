@@ -19,6 +19,8 @@ import type { CorporationRecord } from "../types/corporationRecord";
 import type { DealRecord } from "../types/dealRecord";
 import type { BrokerRecord } from "../types/brokerRecord";
 import type { PositionRecord } from "../types/positionRecord";
+import type { FunderRecord } from "../types/funderRecord";
+import ComboBox from "../customwidgets/ComboBox";
 
 const API_BASE =
     import.meta.env.VITE_ENV_IS_TEST_ENV === "true"
@@ -151,6 +153,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const [formData, setFormData] = useState<DealFormData>(emptyForm);
     const [formError, setFormError] = useState<string | null>(null);
     const [positions, setPositions] = useState<PositionRecord[]>([]);
+    const [funders, setFunders] = useState<FunderRecord[]>([]);
     const [isAddingPosition, setIsAddingPosition] = useState(false);
     const [editingPositionId, setEditingPositionId] = useState<string | null>(null);
     const [positionForm, setPositionForm] = useState({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true });
@@ -163,14 +166,17 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     useEffect(() => {
         const fetchInit = async () => {
             try {
-                const [corpRes, brokerRes] = await Promise.all([
+                const [corpRes, brokerRes, funderRes] = await Promise.all([
                     fetch(`${API_BASE}/api/corporation`, { headers }),
                     fetch(`${API_BASE}/api/broker`, { headers }),
+                    fetch(`${API_BASE}/api/funder`, { headers }),
                 ]);
                 if (!corpRes.ok) throw new Error("Failed to fetch corporations");
                 if (!brokerRes.ok) throw new Error("Failed to fetch brokers");
+                if (!funderRes.ok) throw new Error("Failed to fetch funders");
                 setCorporations(await corpRes.json());
                 setBrokers(await brokerRes.json());
+                setFunders(await funderRes.json());
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed to load data");
             }
@@ -277,11 +283,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     };
 
     const handleAddPosition = async () => {
+        const funderName = await ensureFunder(positionForm.funder);
         const newPos: PositionRecord = {
             _id: `temp_${Date.now()}`,
             position: positions.length + 1,
             frequency: positionForm.frequency,
-            funder: positionForm.funder,
+            funder: funderName,
             monthlyPaymentAmount: positionForm.monthlyPaymentAmount ? parseFloat(stripCommas(positionForm.monthlyPaymentAmount)) : 0,
             fundedDate: positionForm.fundedDate || "",
             status: positionForm.status,
@@ -326,6 +333,24 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         }
     };
 
+    const ensureFunder = async (name: string): Promise<string> => {
+        if (!name.trim()) return "";
+        // Check if funder already exists (case-insensitive)
+        const titleCased = name.trim().replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase());
+        const existing = funders.find(f => f.funderName === titleCased);
+        if (existing) return titleCased;
+        // Create new funder
+        try {
+            const res = await fetch(`${API_BASE}/api/funder`, { method: "POST", headers, body: JSON.stringify({ funderName: name }) });
+            if (res.ok) {
+                const newFunder = await res.json();
+                setFunders(prev => [...prev, newFunder].sort((a, b) => a.funderName.localeCompare(b.funderName)));
+                return newFunder.funderName;
+            }
+        } catch { /* ignore */ }
+        return titleCased;
+    };
+
     const startEditPosition = (pos: PositionRecord) => {
         setEditingPositionId(pos._id);
         setPositionForm({
@@ -339,9 +364,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
     const handleSavePosition = async () => {
         if (!editingPositionId) return;
+        const funderName = await ensureFunder(positionForm.funder);
         const updated = {
             frequency: positionForm.frequency,
-            funder: positionForm.funder,
+            funder: funderName,
             monthlyPaymentAmount: positionForm.monthlyPaymentAmount ? parseFloat(stripCommas(positionForm.monthlyPaymentAmount)) : null,
             fundedDate: positionForm.fundedDate || null,
             status: positionForm.status,
@@ -562,9 +588,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
     const formGrid = (
         <div>
-            {/* Section 0: Client Overview */}
+            {/* Section 0: Current Client Financials */}
             <div className="form-section">
-                <div className="form-section-header">Client Overview</div>
+                <div className="form-section-header">Current Client Financials</div>
                 <div className="form-grid-4">
                     <div className="form-row" title="Client's total gross monthly revenue">
                         <label>Gross Monthly Revenue</label>
@@ -662,10 +688,14 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 <div className="form-grid-4">
                     <div className="form-row" title="Select the broker associated with this deal">
                         <label>Broker</label>
-                        <select value={formData.broker} onChange={(e) => setFormData({ ...formData, broker: e.target.value })}>
-                            <option value="">-- None --</option>
-                            {brokers.map((b) => (<option key={b._id} value={b._id}>{b.brokerName}</option>))}
-                        </select>
+                        <ComboBox
+                            value={formData.broker}
+                            options={brokers.map(b => ({ value: b._id, label: b.brokerName }))}
+                            onChange={(v) => setFormData({ ...formData, broker: v })}
+                            placeholder="Select broker"
+                            maxVisible={8}
+                            strictMode
+                        />
                     </div>
                     <div className="form-row" title="Date the deal was funded">
                         <label>Funded Date</label>
@@ -1108,10 +1138,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <tbody>
                             {positions.map((pos) => (
                                 editingPositionId === pos._id ? (
-                                    <tr key={pos._id}>
+                                    <tr key={pos._id} className="position-row">
                                         <td style={{ textAlign: "center" }}>{pos.position}</td>
                                         <td><select value={positionForm.frequency} onChange={(e) => setPositionForm({ ...positionForm, frequency: e.target.value })} style={{ width: "100%" }}><option value="">-- Select --</option><option value="Daily">Daily</option><option value="Bi-Weekly">Bi-Weekly</option><option value="Weekly">Weekly</option><option value="Monthly">Monthly</option></select></td>
-                                        <td><input type="text" value={positionForm.funder} onChange={(e) => setPositionForm({ ...positionForm, funder: e.target.value })} style={{ width: "100%" }} /></td>
+                                        <td><ComboBox value={positionForm.funder} options={funders.map(f => f.funderName)} onChange={(v) => setPositionForm({ ...positionForm, funder: v })} placeholder="Type to search or add" style={{ width: "100%" }} /></td>
                                         <td><input type="number" step="0.01" placeholder="0.00" value={positionForm.monthlyPaymentAmount} onChange={(e) => setPositionForm({ ...positionForm, monthlyPaymentAmount: e.target.value })} style={{ width: "100%" }} /></td>
                                         <td><input type="date" value={positionForm.fundedDate} onChange={(e) => setPositionForm({ ...positionForm, fundedDate: e.target.value })} style={{ width: "100%" }} /></td>
                                         <td style={{ textAlign: "center" }}>
@@ -1126,7 +1156,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         </td>
                                     </tr>
                                 ) : (
-                                    <tr key={pos._id}>
+                                    <tr key={pos._id} className="position-row">
                                         <td style={{ textAlign: "center" }}>{pos.position}</td>
                                         <td style={{ textAlign: "center" }}>{pos.frequency || "-"}</td>
                                         <td>{pos.funder || "-"}</td>
@@ -1147,7 +1177,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 <tr>
                                     <td style={{ textAlign: "center" }}>{positions.length + 1}</td>
                                     <td><select value={positionForm.frequency} onChange={(e) => setPositionForm({ ...positionForm, frequency: e.target.value })} style={{ width: "100%" }}><option value="">-- Select --</option><option value="Daily">Daily</option><option value="Bi-Weekly">Bi-Weekly</option><option value="Weekly">Weekly</option><option value="Monthly">Monthly</option></select></td>
-                                    <td><input type="text" placeholder="Funder name" value={positionForm.funder} onChange={(e) => setPositionForm({ ...positionForm, funder: e.target.value })} style={{ width: "100%" }} /></td>
+                                    <td><ComboBox value={positionForm.funder} options={funders.map(f => f.funderName)} onChange={(v) => setPositionForm({ ...positionForm, funder: v })} placeholder="Type to search or add" style={{ width: "100%" }} /></td>
                                     <td><input type="number" step="0.01" placeholder="0.00" value={positionForm.monthlyPaymentAmount} onChange={(e) => setPositionForm({ ...positionForm, monthlyPaymentAmount: e.target.value })} style={{ width: "100%" }} /></td>
                                     <td><input type="date" value={positionForm.fundedDate} onChange={(e) => setPositionForm({ ...positionForm, fundedDate: e.target.value })} style={{ width: "100%" }} /></td>
                                     <td style={{ textAlign: "center" }}>

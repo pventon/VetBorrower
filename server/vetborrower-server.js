@@ -30,6 +30,7 @@ import routeUserAccount from './routes/routeUserAccount.js';
 import routeCorporationRecord from './routes/routeCorporationRecord.js';
 import routeDealRecord from './routes/routeDealRecord.js';
 import routePosition from './routes/routePosition.js';
+import routeFunder from './routes/routeFunder.js';
 import routeBroker from './routes/routeBroker.js';
 import routeSettings from './routes/routeSettings.js';
 import routeOffice from './routes/routeOffice.js';
@@ -130,6 +131,7 @@ async function startServer() {
   app.use(routeCorporationRecord);
   app.use(routeDealRecord);
   app.use(routePosition);
+  app.use(routeFunder);
   app.use(routeBroker);
   app.use(routeSettings);
   app.use(routeOffice);
