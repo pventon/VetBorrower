@@ -34,6 +34,8 @@ import routeFunder from './routes/routeFunder.js';
 import routeBroker from './routes/routeBroker.js';
 import routeSettings from './routes/routeSettings.js';
 import routeOffice from './routes/routeOffice.js';
+import routeExpense from './routes/routeExpense.js';
+import routeFee from './routes/routeFee.js';
 
 const app = express();
 
@@ -135,6 +137,8 @@ async function startServer() {
   app.use(routeBroker);
   app.use(routeSettings);
   app.use(routeOffice);
+  app.use(routeExpense);
+  app.use(routeFee);
 
   // Serve React App for all other routes
   app.get('*path', (req, res) => {

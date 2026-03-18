@@ -29,6 +29,16 @@ export interface UserRole {
   description: string;
 }
 
+export interface ExpenseCategory {
+  category: string;
+  officeAcronym: string;
+}
+
+export interface FeeCategory {
+  category: string;
+  officeAcronym: string;
+}
+
 export interface SettingsRecord {
   _id: string;
   guiPaginationValues: number[];
@@ -37,6 +47,8 @@ export interface SettingsRecord {
   industryTypes: IndustryType[];
   usStates: UsState[];
   userRoles: UserRole[];
+  expenseCategories: ExpenseCategory[];
+  feeCategories: FeeCategory[];
   dateRecordCreated: string;
   dateRecordLastUpdated: string;
 }

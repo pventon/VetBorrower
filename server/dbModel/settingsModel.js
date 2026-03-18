@@ -36,6 +36,16 @@ const UserRole = new mongoose.Schema({
 
 }, { _id: false });
 
+const ExpenseCategory = new mongoose.Schema({
+  category: String,
+  officeAcronym: String,
+}, { _id: false });
+
+const FeeCategory = new mongoose.Schema({
+  category: String,
+  officeAcronym: String,
+}, { _id: false });
+
 // Define the settings schema
 const settingsSchema = new mongoose.Schema({
   // ************************************************************************
@@ -66,6 +76,10 @@ const settingsSchema = new mongoose.Schema({
   usStates: [UsState],
 
   userRoles: [UserRole],
+
+  expenseCategories: [ExpenseCategory],
+
+  feeCategories: [FeeCategory],
   // ************************************************************************
 
   // Internal record data

@@ -86,6 +86,10 @@ const dealSchema = new mongoose.Schema({
   // Open positions
   positions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Positions' }],
 
+  // Expenses and Fees
+  expenses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Expenses' }],
+  fees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Fees' }],
+
   // Deal renewal linking
   renewalDealId: { type: mongoose.Schema.Types.ObjectId, ref: 'Deals', default: null },  // Points to the renewal created from this deal
   parentDealId: { type: mongoose.Schema.Types.ObjectId, ref: 'Deals', default: null },   // Points back to the deal this renewal was created from

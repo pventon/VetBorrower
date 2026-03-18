@@ -13,15 +13,29 @@
  * shall it be used for any purpose other than in connection with an
  * agreement or proposed agreement with Ventec SW LLC.
  */
+import FeesModel from '../dbModel/feeRecordModel.js';
 
-export interface PositionRecord {
-  _id: string;
-  dealId: string;
-  position: number;
-  frequency: string;
-  funder: string;
-  monthlyPaymentAmount: number;
-  fundedDate: string;
-  status: boolean;  // true = Active, false = Inactive
-  officeAcronym: string;
+export async function GetAllFees(filter = {}) {
+  return await FeesModel.find(filter).sort({ feeNumber: 1 });
+}
+
+export async function GetFeesByIds(ids) {
+  return await FeesModel.find({ _id: { $in: ids } }).sort({ feeNumber: 1 });
+}
+
+export async function GetFeeById(id) {
+  return await FeesModel.findById(id);
+}
+
+export async function AddFee(data) {
+  const record = new FeesModel(data);
+  return await record.save();
+}
+
+export async function UpdateFee(id, data) {
+  return await FeesModel.findByIdAndUpdate(id, data, { returnDocument: 'after' });
+}
+
+export async function DeleteFee(id) {
+  return await FeesModel.findByIdAndDelete(id);
 }

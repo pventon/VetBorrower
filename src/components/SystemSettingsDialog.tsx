@@ -16,7 +16,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
-import type { SettingsRecord, IndustryType, UsState, UserRole } from "../types/settingsRecord";
+import type { SettingsRecord, IndustryType, UsState, UserRole, ExpenseCategory, FeeCategory } from "../types/settingsRecord";
 import type { FunderRecord } from "../types/funderRecord";
 
 const API_BASE =
@@ -28,7 +28,7 @@ interface SystemSettingsDialogProps {
     onClose: () => void;
 }
 
-type TabName = "general" | "industryTypes" | "usStates" | "userRoles" | "funders";
+type TabName = "general" | "industryTypes" | "usStates" | "userRoles" | "funders" | "expenseCategories" | "feeCategories";
 
 export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogProps) {
     const { token, hasRole, user: currentUser } = useAuth();
@@ -56,6 +56,10 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
     const [funderFormOffice, setFunderFormOffice] = useState("");
     const [officeAcronyms, setOfficeAcronyms] = useState<string[]>([]);
 
+    // Expense & Fee Categories (stored in settings arrays)
+    const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+    const [feeCategories, setFeeCategories] = useState<FeeCategory[]>([]);
+
     useEffect(() => {
         if (settings) {
             setServerPort(settings.serverPort);
@@ -64,6 +68,8 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
             setIndustryTypes([...settings.industryTypes]);
             setUsStates([...settings.usStates]);
             setUserRoles([...settings.userRoles]);
+            setExpenseCategories([...(settings.expenseCategories || [])]);
+            setFeeCategories([...(settings.feeCategories || [])]);
         }
     }, [settings]);
 
@@ -139,6 +145,24 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
         }
     };
 
+    // Expense category helpers (settings array)
+    const addExpenseCategory = () => setExpenseCategories([...expenseCategories, { category: "", officeAcronym: isRoot ? "" : (currentUser?.officeAcronym ?? "") }]);
+    const removeExpenseCategory = (i: number) => setExpenseCategories(expenseCategories.filter((_, idx) => idx !== i));
+    const updateExpenseCategory = (i: number, field: keyof ExpenseCategory, value: string) => {
+        const updated = [...expenseCategories];
+        updated[i] = { ...updated[i], [field]: value };
+        setExpenseCategories(updated);
+    };
+
+    // Fee category helpers (settings array)
+    const addFeeCategory = () => setFeeCategories([...feeCategories, { category: "", officeAcronym: isRoot ? "" : (currentUser?.officeAcronym ?? "") }]);
+    const removeFeeCategory = (i: number) => setFeeCategories(feeCategories.filter((_, idx) => idx !== i));
+    const updateFeeCategory = (i: number, field: keyof FeeCategory, value: string) => {
+        const updated = [...feeCategories];
+        updated[i] = { ...updated[i], [field]: value };
+        setFeeCategories(updated);
+    };
+
     const headers = {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
@@ -161,6 +185,8 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
             industryTypes,
             usStates,
             userRoles,
+            expenseCategories,
+            feeCategories,
         };
 
         try {
@@ -212,6 +238,8 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
         { key: "industryTypes", label: "Industry Types" },
         { key: "usStates", label: "US States" },
         { key: "funders", label: "Funders" },
+        { key: "expenseCategories", label: "Expense Categories" },
+        { key: "feeCategories", label: "Fee Categories" },
         ...(hasRole("root") ? [{ key: "userRoles" as TabName, label: "User Roles" }] : []),
     ];
 
@@ -409,6 +437,76 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
                                         {fundersList.length === 0 && !isAddingFunder && (
                                             <tr><td colSpan={isRoot ? 3 : 2} className="empty-row">No funders configured</td></tr>
                                         )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {activeTab === "expenseCategories" && (
+                            <div>
+                                <button className="btn btn-sm" onClick={addExpenseCategory}>Add Expense Category</button>
+                                <table className="dialog-table settings-array-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            {isRoot && <th>Office</th>}
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {expenseCategories.map((item, i) => (
+                                            <tr key={i}>
+                                                <td>
+                                                    <input type="text" value={item.category} onChange={(e) => updateExpenseCategory(i, "category", e.target.value)} />
+                                                </td>
+                                                {isRoot && (
+                                                    <td>
+                                                        <select value={item.officeAcronym || ""} onChange={(e) => updateExpenseCategory(i, "officeAcronym", e.target.value)}>
+                                                            <option value="">-- Select --</option>
+                                                            {officeAcronyms.map(a => <option key={a} value={a}>{a}</option>)}
+                                                        </select>
+                                                    </td>
+                                                )}
+                                                <td>
+                                                    <button className="btn btn-sm btn-danger" onClick={() => removeExpenseCategory(i)}>Remove</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {activeTab === "feeCategories" && (
+                            <div>
+                                <button className="btn btn-sm" onClick={addFeeCategory}>Add Fee Category</button>
+                                <table className="dialog-table settings-array-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            {isRoot && <th>Office</th>}
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {feeCategories.map((item, i) => (
+                                            <tr key={i}>
+                                                <td>
+                                                    <input type="text" value={item.category} onChange={(e) => updateFeeCategory(i, "category", e.target.value)} />
+                                                </td>
+                                                {isRoot && (
+                                                    <td>
+                                                        <select value={item.officeAcronym || ""} onChange={(e) => updateFeeCategory(i, "officeAcronym", e.target.value)}>
+                                                            <option value="">-- Select --</option>
+                                                            {officeAcronyms.map(a => <option key={a} value={a}>{a}</option>)}
+                                                        </select>
+                                                    </td>
+                                                )}
+                                                <td>
+                                                    <button className="btn btn-sm btn-danger" onClick={() => removeFeeCategory(i)}>Remove</button>
+                                                </td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>

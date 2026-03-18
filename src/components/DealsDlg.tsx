@@ -19,6 +19,8 @@ import type { CorporationRecord } from "../types/corporationRecord";
 import type { DealRecord } from "../types/dealRecord";
 import type { BrokerRecord } from "../types/brokerRecord";
 import type { PositionRecord } from "../types/positionRecord";
+import type { ExpenseRecord } from "../types/expenseRecord";
+import type { FeeRecord } from "../types/feeRecord";
 import type { FunderRecord } from "../types/funderRecord";
 import ComboBox from "../customwidgets/ComboBox";
 
@@ -172,7 +174,22 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const [funders, setFunders] = useState<FunderRecord[]>([]);
     const [isAddingPosition, setIsAddingPosition] = useState(false);
     const [editingPositionId, setEditingPositionId] = useState<string | null>(null);
-    const [positionForm, setPositionForm] = useState({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true });
+    const [positionForm, setPositionForm] = useState({ positionNumber: "", frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true });
+    const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+    const [fees, setFees] = useState<FeeRecord[]>([]);
+    const [isAddingExpense, setIsAddingExpense] = useState(false);
+    const [isAddingFee, setIsAddingFee] = useState(false);
+    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+        clientFinancials: true, dealDetails: true, funding: true, ratesTerms: true,
+        costsFees: true, expenses: true, fees: true, performance: true,
+        default: true, renewal: true, compound: true, positions: true,
+    });
+    const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+    const [editingFeeId, setEditingFeeId] = useState<string | null>(null);
+    const [expenseForm, setExpenseForm] = useState({ expenseDate: "", expenseDescription: "", expenseAmount: "", expenseCategory: "" });
+    const [feeForm, setFeeForm] = useState({ feeDate: "", feeDescription: "", feeAmount: "", feeCategory: "" });
+    const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
+    const [feeCategories, setFeeCategories] = useState<string[]>([]);
     const [showCompoundInfo, setShowCompoundInfo] = useState(false);
 
     const headers = {
@@ -183,10 +200,11 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     useEffect(() => {
         const fetchInit = async () => {
             try {
-                const [corpRes, brokerRes, funderRes] = await Promise.all([
+                const [corpRes, brokerRes, funderRes, settingsRes] = await Promise.all([
                     fetch(`${API_BASE}/api/corporation`, { headers }),
                     fetch(`${API_BASE}/api/broker`, { headers }),
                     fetch(`${API_BASE}/api/funder?officeAcronym=${currentUser?.officeAcronym ?? ""}`, { headers }),
+                    fetch(`${API_BASE}/api/settings`, { headers }),
                 ]);
                 if (!corpRes.ok) throw new Error("Failed to fetch corporations");
                 if (!brokerRes.ok) throw new Error("Failed to fetch brokers");
@@ -194,12 +212,44 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 setCorporations(await corpRes.json());
                 setBrokers(await brokerRes.json());
                 setFunders(await funderRes.json());
+                if (settingsRes.ok) {
+                    const settingsData = await settingsRes.json();
+                    const settings = Array.isArray(settingsData) ? settingsData[0] : settingsData;
+                    if (settings) {
+                        const officeAcr = currentUser?.officeAcronym ?? "";
+                        setExpenseCategories((settings.expenseCategories || []).filter((c: { category: string; officeAcronym: string }) => c.officeAcronym === officeAcr).map((c: { category: string }) => c.category));
+                        setFeeCategories((settings.feeCategories || []).filter((c: { category: string; officeAcronym: string }) => c.officeAcronym === officeAcr).map((c: { category: string }) => c.category));
+                    }
+                }
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed to load data");
             }
         };
         fetchInit();
     }, []);
+
+    // Auto-update position field when positions array changes
+    useEffect(() => {
+        if (showForm || isAdding) {
+            const maxPos = positions.reduce((max, p) => Math.max(max, p.position || 0), 0);
+            setFormData(f => ({ ...f, position: String(maxPos + 1) }));
+        }
+    }, [positions.length]);
+
+    // Auto-populate miscellaneous fields when expenses/fees change
+    useEffect(() => {
+        if (showForm || isAdding) {
+            const expenseTotal = expenses.reduce((sum, e) => sum + (e.expenseAmount || 0), 0);
+            setFormData(f => ({ ...f, miscellaneousExpenses: expenseTotal > 0 ? formatDollar(expenseTotal.toFixed(2)) : "" }));
+        }
+    }, [expenses]);
+
+    useEffect(() => {
+        if (showForm || isAdding) {
+            const feeTotal = fees.reduce((sum, f) => sum + (f.feeAmount || 0), 0);
+            setFormData(f => ({ ...f, miscellaneousFees: feeTotal > 0 ? formatDollar(feeTotal.toFixed(2)) : "" }));
+        }
+    }, [fees]);
 
     const fetchDeals = async (corpId: string) => {
         if (!corpId) { setDeals([]); return; }
@@ -224,6 +274,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         setFormData({ ...emptyForm, fundedDate: new Date().toISOString().split("T")[0] });
         setFormError(null);
         setIsAdding(true);
+        setExpenses([]);
+        setFees([]);
     };
 
     const startEdit = (deal: DealRecord) => {
@@ -307,8 +359,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             currentRoi: deal.currentRoi?.toFixed(2) ?? "",
         });
         setFormError(null);
-        // Fetch positions for this deal
+        // Fetch positions, expenses, and fees for this deal
         fetchPositions(deal._id);
+        fetchExpenses(deal._id);
+        fetchFees(deal._id);
     };
 
     const cancelForm = () => {
@@ -318,6 +372,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         setFormError(null);
         setPositions([]);
         setIsAddingPosition(false);
+        setExpenses([]);
+        setFees([]);
+        setIsAddingExpense(false);
+        setIsAddingFee(false);
+        setEditingExpenseId(null);
+        setEditingFeeId(null);
     };
 
     const fetchPositions = async (dealId: string) => {
@@ -327,21 +387,39 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         } catch { /* ignore */ }
     };
 
+    const fetchExpenses = async (dealId: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/api/expense?dealId=${dealId}`, { headers });
+            if (res.ok) setExpenses(await res.json());
+        } catch { /* ignore */ }
+    };
+
+    const fetchFees = async (dealId: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/api/fee?dealId=${dealId}`, { headers });
+            if (res.ok) setFees(await res.json());
+        } catch { /* ignore */ }
+    };
+
     const handleAddPosition = async () => {
         const funderName = await ensureFunder(positionForm.funder);
+        const maxPos = positions.reduce((max, p) => Math.max(max, p.position || 0), 0);
+        const posNum = positionForm.positionNumber ? parseInt(positionForm.positionNumber) : maxPos + 1;
         const newPos: PositionRecord = {
             _id: `temp_${Date.now()}`,
-            position: positions.length + 1,
+            dealId: editingDeal?.entityId ?? "",
+            position: posNum,
             frequency: positionForm.frequency,
             funder: funderName,
             monthlyPaymentAmount: positionForm.monthlyPaymentAmount ? parseFloat(stripCommas(positionForm.monthlyPaymentAmount)) : 0,
             fundedDate: positionForm.fundedDate || "",
             status: positionForm.status,
+            officeAcronym: currentUser?.officeAcronym ?? "",
         };
 
         if (editingDeal) {
             // Save to DB immediately when editing an existing deal
-            const payload = { dealId: editingDeal._id, ...newPos, _id: undefined };
+            const payload = { ...newPos, dealId: editingDeal._id, _id: undefined };
             try {
                 const res = await fetch(`${API_BASE}/api/position`, { method: "POST", headers, body: JSON.stringify(payload) });
                 if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to add position"); }
@@ -357,7 +435,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         }
 
         setIsAddingPosition(false);
-        setPositionForm({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true });
+        setPositionForm({ positionNumber: "", frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true });
     };
 
     const handleDeletePosition = async (posId: string) => {
@@ -419,6 +497,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const startEditPosition = (pos: PositionRecord) => {
         setEditingPositionId(pos._id);
         setPositionForm({
+            positionNumber: pos.position?.toString() ?? "",
             frequency: pos.frequency || "",
             funder: pos.funder || "",
             monthlyPaymentAmount: pos.monthlyPaymentAmount?.toString() ?? "",
@@ -431,6 +510,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         if (!editingPositionId) return;
         const funderName = await ensureFunder(positionForm.funder);
         const updated = {
+            position: positionForm.positionNumber ? parseInt(positionForm.positionNumber) : 0,
             frequency: positionForm.frequency,
             funder: funderName,
             monthlyPaymentAmount: positionForm.monthlyPaymentAmount ? parseFloat(stripCommas(positionForm.monthlyPaymentAmount)) : null,
@@ -452,7 +532,179 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             }
         }
         setEditingPositionId(null);
-        setPositionForm({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true });
+        setPositionForm({ positionNumber: "", frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true });
+    };
+
+    // ── Expense CRUD ──
+
+    const handleAddExpense = async () => {
+        const maxNum = expenses.reduce((max, e) => Math.max(max, e.expenseNumber || 0), 0);
+        const newExp: ExpenseRecord = {
+            _id: `temp_${Date.now()}`,
+            dealId: editingDeal?.entityId ?? "",
+            expenseNumber: maxNum + 1,
+            expenseDate: expenseForm.expenseDate || "",
+            expenseDescription: expenseForm.expenseDescription || "",
+            expenseAmount: expenseForm.expenseAmount ? parseFloat(stripCommas(expenseForm.expenseAmount)) : 0,
+            expenseCategory: expenseForm.expenseCategory || "",
+            officeAcronym: currentUser?.officeAcronym ?? "",
+        };
+
+        if (editingDeal) {
+            const payload = { ...newExp, dealId: editingDeal._id, _id: undefined };
+            try {
+                const res = await fetch(`${API_BASE}/api/expense`, { method: "POST", headers, body: JSON.stringify(payload) });
+                if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to add expense"); }
+                await fetchExpenses(editingDeal._id);
+                await fetchDeals(selectedCorpId);
+            } catch (err) {
+                setFormError(err instanceof Error ? err.message : "Failed to add expense");
+                return;
+            }
+        } else {
+            setExpenses([...expenses, newExp]);
+        }
+
+        setIsAddingExpense(false);
+        setExpenseForm({ expenseDate: "", expenseDescription: "", expenseAmount: "", expenseCategory: "" });
+    };
+
+    const handleDeleteExpense = async (expId: string) => {
+        if (!confirm("Delete this expense?")) return;
+        if (expId.startsWith("temp_")) {
+            setExpenses(expenses.filter(e => e._id !== expId));
+            return;
+        }
+        if (!editingDeal) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/expense/${expId}?dealId=${editingDeal._id}`, { method: "DELETE", headers });
+            if (!res.ok) throw new Error("Failed to delete expense");
+            await fetchExpenses(editingDeal._id);
+            await fetchDeals(selectedCorpId);
+        } catch (err) {
+            setFormError(err instanceof Error ? err.message : "Delete expense failed");
+        }
+    };
+
+    const startEditExpense = (exp: ExpenseRecord) => {
+        setEditingExpenseId(exp._id);
+        setExpenseForm({
+            expenseDate: toDateInput(exp.expenseDate),
+            expenseDescription: exp.expenseDescription || "",
+            expenseAmount: exp.expenseAmount?.toString() ?? "",
+            expenseCategory: exp.expenseCategory || "",
+        });
+    };
+
+    const handleSaveExpense = async () => {
+        if (!editingExpenseId) return;
+        const updated = {
+            expenseDate: expenseForm.expenseDate || null,
+            expenseDescription: expenseForm.expenseDescription || "",
+            expenseAmount: expenseForm.expenseAmount ? parseFloat(stripCommas(expenseForm.expenseAmount)) : 0,
+            expenseCategory: expenseForm.expenseCategory || "",
+        };
+
+        if (editingExpenseId.startsWith("temp_")) {
+            setExpenses(expenses.map(e => e._id === editingExpenseId ? { ...e, ...updated, expenseDate: updated.expenseDate ?? "", expenseAmount: updated.expenseAmount ?? 0 } : e));
+        } else if (editingDeal) {
+            try {
+                const res = await fetch(`${API_BASE}/api/expense/${editingExpenseId}`, { method: "PUT", headers, body: JSON.stringify(updated) });
+                if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to update expense"); }
+                await fetchExpenses(editingDeal._id);
+            } catch (err) {
+                setFormError(err instanceof Error ? err.message : "Failed to update expense");
+                return;
+            }
+        }
+        setEditingExpenseId(null);
+        setExpenseForm({ expenseDate: "", expenseDescription: "", expenseAmount: "", expenseCategory: "" });
+    };
+
+    // ── Fee CRUD ──
+
+    const handleAddFee = async () => {
+        const maxNum = fees.reduce((max, f) => Math.max(max, f.feeNumber || 0), 0);
+        const newFee: FeeRecord = {
+            _id: `temp_${Date.now()}`,
+            dealId: editingDeal?.entityId ?? "",
+            feeNumber: maxNum + 1,
+            feeDate: feeForm.feeDate || "",
+            feeDescription: feeForm.feeDescription || "",
+            feeAmount: feeForm.feeAmount ? parseFloat(stripCommas(feeForm.feeAmount)) : 0,
+            feeCategory: feeForm.feeCategory || "",
+            officeAcronym: currentUser?.officeAcronym ?? "",
+        };
+
+        if (editingDeal) {
+            const payload = { ...newFee, dealId: editingDeal._id, _id: undefined };
+            try {
+                const res = await fetch(`${API_BASE}/api/fee`, { method: "POST", headers, body: JSON.stringify(payload) });
+                if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to add fee"); }
+                await fetchFees(editingDeal._id);
+                await fetchDeals(selectedCorpId);
+            } catch (err) {
+                setFormError(err instanceof Error ? err.message : "Failed to add fee");
+                return;
+            }
+        } else {
+            setFees([...fees, newFee]);
+        }
+
+        setIsAddingFee(false);
+        setFeeForm({ feeDate: "", feeDescription: "", feeAmount: "", feeCategory: "" });
+    };
+
+    const handleDeleteFee = async (feeId: string) => {
+        if (!confirm("Delete this fee?")) return;
+        if (feeId.startsWith("temp_")) {
+            setFees(fees.filter(f => f._id !== feeId));
+            return;
+        }
+        if (!editingDeal) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/fee/${feeId}?dealId=${editingDeal._id}`, { method: "DELETE", headers });
+            if (!res.ok) throw new Error("Failed to delete fee");
+            await fetchFees(editingDeal._id);
+            await fetchDeals(selectedCorpId);
+        } catch (err) {
+            setFormError(err instanceof Error ? err.message : "Delete fee failed");
+        }
+    };
+
+    const startEditFee = (fee: FeeRecord) => {
+        setEditingFeeId(fee._id);
+        setFeeForm({
+            feeDate: toDateInput(fee.feeDate),
+            feeDescription: fee.feeDescription || "",
+            feeAmount: fee.feeAmount?.toString() ?? "",
+            feeCategory: fee.feeCategory || "",
+        });
+    };
+
+    const handleSaveFee = async () => {
+        if (!editingFeeId) return;
+        const updated = {
+            feeDate: feeForm.feeDate || null,
+            feeDescription: feeForm.feeDescription || "",
+            feeAmount: feeForm.feeAmount ? parseFloat(stripCommas(feeForm.feeAmount)) : 0,
+            feeCategory: feeForm.feeCategory || "",
+        };
+
+        if (editingFeeId.startsWith("temp_")) {
+            setFees(fees.map(f => f._id === editingFeeId ? { ...f, ...updated, feeDate: updated.feeDate ?? "", feeAmount: updated.feeAmount ?? 0 } : f));
+        } else if (editingDeal) {
+            try {
+                const res = await fetch(`${API_BASE}/api/fee/${editingFeeId}`, { method: "PUT", headers, body: JSON.stringify(updated) });
+                if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to update fee"); }
+                await fetchFees(editingDeal._id);
+            } catch (err) {
+                setFormError(err instanceof Error ? err.message : "Failed to update fee");
+                return;
+            }
+        }
+        setEditingFeeId(null);
+        setFeeForm({ feeDate: "", feeDescription: "", feeAmount: "", feeCategory: "" });
     };
 
     const handleSave = async () => {
@@ -554,6 +806,39 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             monthlyPaymentAmount: pos.monthlyPaymentAmount,
                             fundedDate: pos.fundedDate || null,
                             status: pos.status,
+                            officeAcronym: pos.officeAcronym || currentUser?.officeAcronym || "",
+                        }),
+                    });
+                }
+                // Save any pending local expenses to the new deal
+                for (const exp of expenses.filter(e => e._id.startsWith("temp_"))) {
+                    await fetch(`${API_BASE}/api/expense`, {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify({
+                            dealId: resData._id,
+                            expenseNumber: exp.expenseNumber,
+                            expenseDate: exp.expenseDate || null,
+                            expenseDescription: exp.expenseDescription,
+                            expenseAmount: exp.expenseAmount,
+                            expenseCategory: exp.expenseCategory,
+                            officeAcronym: exp.officeAcronym || currentUser?.officeAcronym || "",
+                        }),
+                    });
+                }
+                // Save any pending local fees to the new deal
+                for (const fee of fees.filter(f => f._id.startsWith("temp_"))) {
+                    await fetch(`${API_BASE}/api/fee`, {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify({
+                            dealId: resData._id,
+                            feeNumber: fee.feeNumber,
+                            feeDate: fee.feeDate || null,
+                            feeDescription: fee.feeDescription,
+                            feeAmount: fee.feeAmount,
+                            feeCategory: fee.feeCategory,
+                            officeAcronym: fee.officeAcronym || currentUser?.officeAcronym || "",
                         }),
                     });
                 }
@@ -661,6 +946,26 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     });
                 }
             }
+            // Delete all expenses for this deal
+            try {
+                const expRes = await fetch(`${API_BASE}/api/expense?dealId=${deal._id}`, { headers });
+                if (expRes.ok) {
+                    const dealExpenses: ExpenseRecord[] = await expRes.json();
+                    for (const exp of dealExpenses) {
+                        await fetch(`${API_BASE}/api/expense/${exp._id}?dealId=${deal._id}`, { method: "DELETE", headers });
+                    }
+                }
+            } catch { /* ignore */ }
+            // Delete all fees for this deal
+            try {
+                const feeRes = await fetch(`${API_BASE}/api/fee?dealId=${deal._id}`, { headers });
+                if (feeRes.ok) {
+                    const dealFees: FeeRecord[] = await feeRes.json();
+                    for (const fee of dealFees) {
+                        await fetch(`${API_BASE}/api/fee/${fee._id}?dealId=${deal._id}`, { method: "DELETE", headers });
+                    }
+                }
+            } catch { /* ignore */ }
             const res = await fetch(`${API_BASE}/api/deal/${deal._id}?corporationId=${selectedCorpId}`, {
                 method: "DELETE",
                 headers,
@@ -685,7 +990,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         if (parent) startEdit(parent);
     };
 
-    const handleRenew = (deal: DealRecord) => {
+    const handleRenew = async (deal: DealRecord) => {
         setEditingDeal(null);
         setRenewingParentId(deal._id);
         const today = new Date().toISOString().split("T")[0];
@@ -710,6 +1015,20 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         });
         setFormError(null);
         setIsAdding(true);
+
+        // Copy positions from parent deal to renewal
+        try {
+            const res = await fetch(`${API_BASE}/api/position?dealId=${deal._id}`, { headers });
+            if (res.ok) {
+                const parentPositions: PositionRecord[] = await res.json();
+                const copiedPositions = parentPositions.map((p, i) => ({
+                    ...p,
+                    _id: `temp_${Date.now()}_${i}`,
+                    officeAcronym: p.officeAcronym || currentUser?.officeAcronym || "",
+                }));
+                setPositions(copiedPositions);
+            }
+        } catch { /* ignore — positions just won't be copied */ }
     };
 
     // Build hierarchical deal list: root deals followed by their renewal chains, indented
@@ -758,12 +1077,22 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
     const showForm = editingDeal !== null;
 
+    const toggleSection = (key: string) => setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
+    const isSectionOpen = (key: string) => !collapsedSections[key]; // open by default
+
+    const SectionHeader = ({ id, title, count, rightContent }: { id: string; title: string; count?: number; rightContent?: React.ReactNode }) => (
+        <div className="form-section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }} onClick={() => toggleSection(id)}>
+            <span>{isSectionOpen(id) ? "▲" : "▼"} {title}{count !== undefined ? ` (${count})` : ""}</span>
+            {isSectionOpen(id) && rightContent && <span onClick={(e) => e.stopPropagation()}>{rightContent}</span>}
+        </div>
+    );
+
     const formGrid = (
         <div>
             {/* Section 0: Current Client Financials */}
             <div className="form-section">
-                <div className="form-section-header">Current Client Financials</div>
-                <div className="form-grid-4">
+                <SectionHeader id="clientFinancials" title="Current Client Financials" />
+                <div className="form-grid-4" style={{ display: isSectionOpen("clientFinancials") ? undefined : "none" }}>
                     <div className="form-row" title="Client's total gross monthly revenue">
                         <label>Gross Monthly Revenue</label>
                         <div className="input-prefixed">
@@ -856,8 +1185,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
             {/* Section 1: Deal Details */}
             <div className="form-section">
-                <div className="form-section-header">Deal Details</div>
-                <div className="form-grid-4">
+                <SectionHeader id="dealDetails" title="Deal Details" />
+                <div className="form-grid-4" style={{ display: isSectionOpen("dealDetails") ? undefined : "none" }}>
                     <div className="form-row" title="Select the broker associated with this deal">
                         <label>Broker</label>
                         <ComboBox
@@ -873,9 +1202,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <label>Funded Date</label>
                         <input type="date" value={formData.fundedDate} onChange={(e) => setFormData({ ...formData, fundedDate: e.target.value })} />
                     </div>
-                    <div className="form-row" title="Number of open positions (auto-calculated from positions count + 1)">
+                    <div className="form-row" title="Number of open positions (auto-initialized from positions count + 1, can be manually overridden)">
                         <label>Position</label>
-                        <input type="text" value={positions.length + 1} disabled />
+                        <input type="text" value={formData.position} onChange={(e) => setFormData({ ...formData, position: e.target.value })} />
                     </div>
                     <div className="form-row" title="Has this client had a previous Merchant Cash Advance?">
                         <label>MCA History</label>
@@ -890,8 +1219,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
             {/* Section 2: Funding */}
             <div className="form-section">
-                <div className="form-section-header">Funding</div>
-                <div className="form-grid-3">
+                <SectionHeader id="funding" title="Funding" />
+                <div className="form-grid-3" style={{ display: isSectionOpen("funding") ? undefined : "none" }}>
                     <div className="form-row" title="Total dollar amount funded for this deal">
                         <label>Funded Amount</label>
                         <div className="input-prefixed">
@@ -956,8 +1285,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
             {/* Section 3: Rates & Terms */}
             <div className="form-section">
-                <div className="form-section-header">Rates &amp; Terms</div>
-                <div className="form-grid-4">
+                <SectionHeader id="ratesTerms" title="Rates &amp; Terms" />
+                <div className="form-grid-4" style={{ display: isSectionOpen("ratesTerms") ? undefined : "none" }}>
                     <div className="form-row" title="The base rate charged to the borrower before broker fees">
                         <label>Buy Rate</label>
                         <input type="number" step="0.01" placeholder="0.00" value={formData.buyRate}
@@ -1044,8 +1373,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
             {/* Section 4: Costs & Fees */}
             <div className="form-section">
-                <div className="form-section-header">Costs &amp; Fees</div>
-                <div className="form-grid-5">
+                <SectionHeader id="costsFees" title="Costs &amp; Fees" />
+                <div className="form-grid-5" style={{ display: isSectionOpen("costsFees") ? undefined : "none" }}>
                     <div className="form-row" title="Any additional miscellaneous fees applied to this deal">
                         <label>Miscellaneous Fees</label>
                         <div className="input-prefixed">
@@ -1111,10 +1440,152 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 </div>
             </div>
 
+            {/* Section 4b: Expenses */}
+            <div className="form-section">
+                <SectionHeader id="expenses" title="Expenses" count={expenses.length} rightContent={
+                    <button className="btn btn-sm" onClick={() => setIsAddingExpense(true)} disabled={isAddingExpense} style={{ textTransform: "none", letterSpacing: "normal", fontSize: "0.75rem" }}>Add Expense</button>
+                } />
+                    <table className="dialog-table" style={{ display: isSectionOpen("expenses") ? undefined : "none" }}>
+                        <thead>
+                            <tr>
+                                <th style={{ textAlign: "center" }}>#</th>
+                                <th style={{ textAlign: "center" }}>Date</th>
+                                <th>Description</th>
+                                <th style={{ textAlign: "right" }}>Amount</th>
+                                <th>Category</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {expenses.map((exp) => (
+                                editingExpenseId === exp._id ? (
+                                    <tr key={exp._id} className="position-row">
+                                        <td style={{ textAlign: "center" }}>{exp.expenseNumber}</td>
+                                        <td><input type="date" value={expenseForm.expenseDate} onChange={(e) => setExpenseForm({ ...expenseForm, expenseDate: e.target.value })} style={{ width: "100%" }} /></td>
+                                        <td><input type="text" value={expenseForm.expenseDescription} onChange={(e) => setExpenseForm({ ...expenseForm, expenseDescription: e.target.value })} style={{ width: "100%" }} /></td>
+                                        <td><input type="number" step="0.01" placeholder="0.00" value={expenseForm.expenseAmount} onChange={(e) => setExpenseForm({ ...expenseForm, expenseAmount: e.target.value })} style={{ width: "100%" }} /></td>
+                                        <td><select value={expenseForm.expenseCategory} onChange={(e) => setExpenseForm({ ...expenseForm, expenseCategory: e.target.value })} style={{ width: "100%" }}><option value="">-- Select --</option>{expenseCategories.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
+                                        <td className="action-cell">
+                                            <button className="btn btn-sm btn-primary" onClick={handleSaveExpense}>Save</button>
+                                            <button className="btn btn-sm" onClick={() => { setEditingExpenseId(null); setExpenseForm({ expenseDate: "", expenseDescription: "", expenseAmount: "", expenseCategory: "" }); }}>Cancel</button>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    <tr key={exp._id} className="position-row">
+                                        <td style={{ textAlign: "center" }}>{exp.expenseNumber}</td>
+                                        <td style={{ textAlign: "center" }}>{formatDate(exp.expenseDate)}</td>
+                                        <td>{exp.expenseDescription || "-"}</td>
+                                        <td style={{ textAlign: "right" }}>{exp.expenseAmount != null ? formatCurrency(exp.expenseAmount) : "-"}</td>
+                                        <td>{exp.expenseCategory || "-"}</td>
+                                        <td className="action-cell">
+                                            <button className="btn btn-sm btn-success" onClick={() => startEditExpense(exp)} disabled={isAddingExpense || editingExpenseId !== null}>Edit</button>
+                                            <button className="btn btn-sm btn-danger" onClick={() => handleDeleteExpense(exp._id)} disabled={isAddingExpense || editingExpenseId !== null}>Delete</button>
+                                        </td>
+                                    </tr>
+                                )
+                            ))}
+                            {expenses.length === 0 && !isAddingExpense && (
+                                <tr><td colSpan={6} className="empty-row">No expenses</td></tr>
+                            )}
+                            {isAddingExpense && (
+                                <tr>
+                                    <td style={{ textAlign: "center" }}>{expenses.reduce((max, e) => Math.max(max, e.expenseNumber || 0), 0) + 1}</td>
+                                    <td><input type="date" value={expenseForm.expenseDate} onChange={(e) => setExpenseForm({ ...expenseForm, expenseDate: e.target.value })} style={{ width: "100%" }} /></td>
+                                    <td><input type="text" value={expenseForm.expenseDescription} onChange={(e) => setExpenseForm({ ...expenseForm, expenseDescription: e.target.value })} placeholder="Description" style={{ width: "100%" }} /></td>
+                                    <td><input type="number" step="0.01" placeholder="0.00" value={expenseForm.expenseAmount} onChange={(e) => setExpenseForm({ ...expenseForm, expenseAmount: e.target.value })} style={{ width: "100%" }} /></td>
+                                    <td><select value={expenseForm.expenseCategory} onChange={(e) => setExpenseForm({ ...expenseForm, expenseCategory: e.target.value })} style={{ width: "100%" }}><option value="">-- Select --</option>{expenseCategories.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
+                                    <td className="action-cell">
+                                        <button className="btn btn-sm btn-primary" onClick={handleAddExpense}>Save</button>
+                                        <button className="btn btn-sm" onClick={() => { setIsAddingExpense(false); setExpenseForm({ expenseDate: "", expenseDescription: "", expenseAmount: "", expenseCategory: "" }); }}>Cancel</button>
+                                    </td>
+                                </tr>
+                            )}
+                            {expenses.length > 0 && (
+                                <tr style={{ fontWeight: "bold", borderTop: "2px solid #3d5470" }}>
+                                    <td colSpan={3} style={{ textAlign: "right" }}>Total:</td>
+                                    <td style={{ textAlign: "right" }}>{formatCurrency(expenses.reduce((sum, e) => sum + (e.expenseAmount || 0), 0))}</td>
+                                    <td colSpan={2}></td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+            {/* Section 4c: Fees */}
+            <div className="form-section">
+                <SectionHeader id="fees" title="Fees" count={fees.length} rightContent={
+                    <button className="btn btn-sm" onClick={() => setIsAddingFee(true)} disabled={isAddingFee} style={{ textTransform: "none", letterSpacing: "normal", fontSize: "0.75rem" }}>Add Fee</button>
+                } />
+                    <table className="dialog-table" style={{ display: isSectionOpen("fees") ? undefined : "none" }}>
+                        <thead>
+                            <tr>
+                                <th style={{ textAlign: "center" }}>#</th>
+                                <th style={{ textAlign: "center" }}>Date</th>
+                                <th>Description</th>
+                                <th style={{ textAlign: "right" }}>Amount</th>
+                                <th>Category</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {fees.map((fee) => (
+                                editingFeeId === fee._id ? (
+                                    <tr key={fee._id} className="position-row">
+                                        <td style={{ textAlign: "center" }}>{fee.feeNumber}</td>
+                                        <td><input type="date" value={feeForm.feeDate} onChange={(e) => setFeeForm({ ...feeForm, feeDate: e.target.value })} style={{ width: "100%" }} /></td>
+                                        <td><input type="text" value={feeForm.feeDescription} onChange={(e) => setFeeForm({ ...feeForm, feeDescription: e.target.value })} style={{ width: "100%" }} /></td>
+                                        <td><input type="number" step="0.01" placeholder="0.00" value={feeForm.feeAmount} onChange={(e) => setFeeForm({ ...feeForm, feeAmount: e.target.value })} style={{ width: "100%" }} /></td>
+                                        <td><select value={feeForm.feeCategory} onChange={(e) => setFeeForm({ ...feeForm, feeCategory: e.target.value })} style={{ width: "100%" }}><option value="">-- Select --</option>{feeCategories.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
+                                        <td className="action-cell">
+                                            <button className="btn btn-sm btn-primary" onClick={handleSaveFee}>Save</button>
+                                            <button className="btn btn-sm" onClick={() => { setEditingFeeId(null); setFeeForm({ feeDate: "", feeDescription: "", feeAmount: "", feeCategory: "" }); }}>Cancel</button>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    <tr key={fee._id} className="position-row">
+                                        <td style={{ textAlign: "center" }}>{fee.feeNumber}</td>
+                                        <td style={{ textAlign: "center" }}>{formatDate(fee.feeDate)}</td>
+                                        <td>{fee.feeDescription || "-"}</td>
+                                        <td style={{ textAlign: "right" }}>{fee.feeAmount != null ? formatCurrency(fee.feeAmount) : "-"}</td>
+                                        <td>{fee.feeCategory || "-"}</td>
+                                        <td className="action-cell">
+                                            <button className="btn btn-sm btn-success" onClick={() => startEditFee(fee)} disabled={isAddingFee || editingFeeId !== null}>Edit</button>
+                                            <button className="btn btn-sm btn-danger" onClick={() => handleDeleteFee(fee._id)} disabled={isAddingFee || editingFeeId !== null}>Delete</button>
+                                        </td>
+                                    </tr>
+                                )
+                            ))}
+                            {fees.length === 0 && !isAddingFee && (
+                                <tr><td colSpan={6} className="empty-row">No fees</td></tr>
+                            )}
+                            {isAddingFee && (
+                                <tr>
+                                    <td style={{ textAlign: "center" }}>{fees.reduce((max, f) => Math.max(max, f.feeNumber || 0), 0) + 1}</td>
+                                    <td><input type="date" value={feeForm.feeDate} onChange={(e) => setFeeForm({ ...feeForm, feeDate: e.target.value })} style={{ width: "100%" }} /></td>
+                                    <td><input type="text" value={feeForm.feeDescription} onChange={(e) => setFeeForm({ ...feeForm, feeDescription: e.target.value })} placeholder="Description" style={{ width: "100%" }} /></td>
+                                    <td><input type="number" step="0.01" placeholder="0.00" value={feeForm.feeAmount} onChange={(e) => setFeeForm({ ...feeForm, feeAmount: e.target.value })} style={{ width: "100%" }} /></td>
+                                    <td><select value={feeForm.feeCategory} onChange={(e) => setFeeForm({ ...feeForm, feeCategory: e.target.value })} style={{ width: "100%" }}><option value="">-- Select --</option>{feeCategories.map(c => <option key={c} value={c}>{c}</option>)}</select></td>
+                                    <td className="action-cell">
+                                        <button className="btn btn-sm btn-primary" onClick={handleAddFee}>Save</button>
+                                        <button className="btn btn-sm" onClick={() => { setIsAddingFee(false); setFeeForm({ feeDate: "", feeDescription: "", feeAmount: "", feeCategory: "" }); }}>Cancel</button>
+                                    </td>
+                                </tr>
+                            )}
+                            {fees.length > 0 && (
+                                <tr style={{ fontWeight: "bold", borderTop: "2px solid #3d5470" }}>
+                                    <td colSpan={3} style={{ textAlign: "right" }}>Total:</td>
+                                    <td style={{ textAlign: "right" }}>{formatCurrency(fees.reduce((sum, f) => sum + (f.feeAmount || 0), 0))}</td>
+                                    <td colSpan={2}></td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
             {/* Section 5: Performance */}
             <div className="form-section">
-                <div className="form-section-header">Performance</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "0 1rem" }}>
+                <SectionHeader id="performance" title="Performance" />
+                <div style={{ display: isSectionOpen("performance") ? "grid" : "none", gridTemplateColumns: "repeat(6, 1fr)", gap: "0 1rem" }}>
                     <div className="form-row" title="Total amount paid in by the borrower to date">
                         <label>Amount Paid In</label>
                         <div className="input-prefixed">
@@ -1204,8 +1675,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
             {/* Section 6: Default */}
             <div className="form-section">
-                <div className="form-section-header">Default</div>
-                <div className="form-grid-3">
+                <SectionHeader id="default" title="Default" />
+                <div className="form-grid-3" style={{ display: isSectionOpen("default") ? undefined : "none" }}>
                     <div className="form-row" title="Check to mark as defaulted. Date and days since funded are linked; changing one updates the other">
                         <label>Default Date / Days</label>
                         <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
@@ -1271,8 +1742,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             {/* Section 7: Renewal (only shown for renewals) */}
             {formData.typeOfDeal === "renewal" && (
             <div className="form-section">
-                <div className="form-section-header">Renewal</div>
-                <div className="form-grid-3">
+                <SectionHeader id="renewal" title="Renewal" />
+                <div className="form-grid-3" style={{ display: isSectionOpen("renewal") ? undefined : "none" }}>
                             <div className="form-row" title="Balance rolled over from the previous deal into this renewal">
                                 <label>Rolled Balance</label>
                                 <div className="input-prefixed">
@@ -1365,7 +1836,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     compoundExpectedRoi: 0, compoundExpectedRoiOnCapital: 0,
                     compoundCurrentRoi: 0, compoundCurrentRoiOnCapital: 0,
                     totalNetCashOut: 0,
-                    positions: [], dealState: "",
+                    positions: [], expenses: [], fees: [], dealState: "",
                     renewalDate: formData.renewalDate || "",
                     renewalDealId: editingDeal?.renewalDealId ?? null,
                     parentDealId: editingDeal?.parentDealId ?? renewingParentId,
@@ -1445,11 +1916,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
                 return (
                     <div className="form-section">
-                        <div className="form-section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span>Compound Performance ({chain.length} Deals in Chain)</span>
+                        <SectionHeader id="compound" title={`Compound Performance (${chain.length} Deals in Chain)`} rightContent={
                             <button className="btn btn-sm" onClick={() => setShowCompoundInfo(true)} style={{ textTransform: "none", letterSpacing: "normal", fontSize: "0.75rem" }}>Info</button>
-                        </div>
-                        <table className="ledger-table">
+                        } />
+                        <table className="ledger-table" style={{ display: isSectionOpen("compound") ? undefined : "none" }}>
                             <thead>
                                 <tr>
                                     <th>Deal</th>
@@ -1460,7 +1930,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     <th>Net Funded +<br/>Broker Commission</th>
                                     <th>Broker<br/>Commission</th>
                                     <th>Total<br/>Payback</th>
-                                    <th>Paid In</th>
+                                    <th>Actual<br/>Paid In</th>
                                     <th>%<br/>Paid In</th>
                                     <th>Rolled<br/>Over</th>
                                     <th>Outstanding</th>
@@ -1522,7 +1992,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     return (
                                         <>
                                         <tr className="ledger-totals">
-                                            <td style={{ textAlign: "left" }}>Totals (per deal)</td>
+                                            <td style={{ textAlign: "left" }}>Totals</td>
                                             <td></td>
                                             <td>{formatCurrency(compoundTotalFunded)}</td>
                                             <td>{formatCurrency(chain.reduce((s, d) => {
@@ -1546,7 +2016,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 })()}
                             </tbody>
                         </table>
-                        <div className="compound-metrics" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+                        <div className="compound-metrics" style={{ gridTemplateColumns: "repeat(3, 1fr)", display: isSectionOpen("compound") ? undefined : "none" }}>
                             <div className="compound-metric-card">
                                 <div className="metric-label">Current ROI (on Cash Out)</div>
                                 <div className={`metric-value ${compoundCurrentRoi >= 0 ? "positive" : "negative"}`}>{compoundCurrentRoi.toFixed(2)}%</div>
@@ -1566,11 +2036,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
 
             {/* Section 9: Open Positions */}
             <div className="form-section">
-                <div className="form-section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>Open Positions</span>
+                <SectionHeader id="positions" title="Open Positions" count={positions.length} rightContent={
                     <button className="btn btn-sm" onClick={() => setIsAddingPosition(true)} disabled={isAddingPosition} style={{ textTransform: "none", letterSpacing: "normal", fontSize: "0.75rem" }}>Add Position</button>
-                </div>
-                    <table className="dialog-table">
+                } />
+                    <table className="dialog-table" style={{ display: isSectionOpen("positions") ? undefined : "none" }}>
                         <thead>
                             <tr>
                                 <th style={{ textAlign: "center" }}>Position</th>
@@ -1586,7 +2055,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             {positions.map((pos) => (
                                 editingPositionId === pos._id ? (
                                     <tr key={pos._id} className="position-row">
-                                        <td style={{ textAlign: "center" }}>{pos.position}</td>
+                                        <td style={{ textAlign: "center" }}><input type="number" value={positionForm.positionNumber} onChange={(e) => setPositionForm({ ...positionForm, positionNumber: e.target.value })} style={{ width: "50px", textAlign: "center" }} /></td>
                                         <td><select value={positionForm.frequency} onChange={(e) => setPositionForm({ ...positionForm, frequency: e.target.value })} style={{ width: "100%" }}><option value="">-- Select --</option><option value="Daily">Daily</option><option value="Bi-Weekly">Bi-Weekly</option><option value="Weekly">Weekly</option><option value="Monthly">Monthly</option></select></td>
                                         <td><ComboBox value={positionForm.funder} options={funders.map(f => f.funderName)} onChange={(v) => setPositionForm({ ...positionForm, funder: v })} placeholder="Type to search or add" style={{ width: "100%" }} /></td>
                                         <td><input type="number" step="0.01" placeholder="0.00" value={positionForm.monthlyPaymentAmount} onChange={(e) => setPositionForm({ ...positionForm, monthlyPaymentAmount: e.target.value })} style={{ width: "100%" }} /></td>
@@ -1599,7 +2068,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         </td>
                                         <td className="action-cell">
                                             <button className="btn btn-sm btn-primary" onClick={handleSavePosition}>Save</button>
-                                            <button className="btn btn-sm" onClick={() => { setEditingPositionId(null); setPositionForm({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true }); }}>Cancel</button>
+                                            <button className="btn btn-sm" onClick={() => { setEditingPositionId(null); setPositionForm({ positionNumber: "", frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true }); }}>Cancel</button>
                                         </td>
                                     </tr>
                                 ) : (
@@ -1622,7 +2091,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             )}
                             {isAddingPosition && (
                                 <tr>
-                                    <td style={{ textAlign: "center" }}>{positions.length + 1}</td>
+                                    <td style={{ textAlign: "center" }}><input type="number" value={positionForm.positionNumber || (positions.reduce((max, p) => Math.max(max, p.position || 0), 0) + 1)} onChange={(e) => setPositionForm({ ...positionForm, positionNumber: e.target.value })} style={{ width: "50px", textAlign: "center" }} /></td>
                                     <td><select value={positionForm.frequency} onChange={(e) => setPositionForm({ ...positionForm, frequency: e.target.value })} style={{ width: "100%" }}><option value="">-- Select --</option><option value="Daily">Daily</option><option value="Bi-Weekly">Bi-Weekly</option><option value="Weekly">Weekly</option><option value="Monthly">Monthly</option></select></td>
                                     <td><ComboBox value={positionForm.funder} options={funders.map(f => f.funderName)} onChange={(v) => setPositionForm({ ...positionForm, funder: v })} placeholder="Type to search or add" style={{ width: "100%" }} /></td>
                                     <td><input type="number" step="0.01" placeholder="0.00" value={positionForm.monthlyPaymentAmount} onChange={(e) => setPositionForm({ ...positionForm, monthlyPaymentAmount: e.target.value })} style={{ width: "100%" }} /></td>
@@ -1635,7 +2104,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     </td>
                                     <td className="action-cell">
                                         <button className="btn btn-sm btn-primary" onClick={handleAddPosition}>Save</button>
-                                        <button className="btn btn-sm" onClick={() => { setIsAddingPosition(false); setPositionForm({ frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true }); }}>Cancel</button>
+                                        <button className="btn btn-sm" onClick={() => { setIsAddingPosition(false); setPositionForm({ positionNumber: "", frequency: "", funder: "", monthlyPaymentAmount: "", fundedDate: "", status: true }); }}>Cancel</button>
                                     </td>
                                 </tr>
                             )}
@@ -1828,7 +2297,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <p>When a deal is renewed before the client has paid back the full funded amount, the per-deal profit will show a <strong style={{ color: "#c62828" }}>loss</strong>. This is correct — it reflects that the client did not fully repay that deal.</p>
                         <p style={{ marginTop: "0.5rem" }}>However, this loss is <strong>recovered through capital recycling</strong>. The rolled balance from the renewal means the next deal requires less new capital. The ledger shows:</p>
                         <ul style={{ marginLeft: "1.5rem" }}>
-                            <li><strong>Totals (per deal)</strong> — Sum of individual deal profits. May show a loss because each deal's profit is measured against its full Funded Amount.</li>
+                            <li><strong>Totals</strong> — Sum of individual deal profits. May show a loss because each deal's profit is measured against its full Funded Amount.</li>
                             <li><strong>Capital recovered via renewals</strong> — The total rolled balance across all renewals. This capital was recycled, not lost. It reduces the actual new money deployed.</li>
                             <li><strong>Adjusted Compound Profit</strong> — Totals Profit + Capital Recovered. This bridges the gap to show the true economic outcome.</li>
                         </ul>

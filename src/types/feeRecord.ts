@@ -14,14 +14,13 @@
  * agreement or proposed agreement with Ventec SW LLC.
  */
 
-export interface PositionRecord {
+export interface FeeRecord {
   _id: string;
   dealId: string;
-  position: number;
-  frequency: string;
-  funder: string;
-  monthlyPaymentAmount: number;
-  fundedDate: string;
-  status: boolean;  // true = Active, false = Inactive
+  feeNumber: number;
+  feeDate: string;
+  feeDescription: string;
+  feeAmount: number;
+  feeCategory: string;
   officeAcronym: string;
 }

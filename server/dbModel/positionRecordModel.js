@@ -16,12 +16,14 @@
 import mongoose from 'mongoose';
 
 const positionSchema = new mongoose.Schema({
+  dealId: String,
   position: Number,
   frequency: String,
   funder: String,
   monthlyPaymentAmount: Number,
   fundedDate: Date,
   status: { type: Boolean, default: true },  // true = Active, false = Inactive
+  officeAcronym: String,
 }, {
   collection: "positions"
 });

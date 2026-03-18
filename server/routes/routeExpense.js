@@ -14,74 +14,69 @@
  * agreement or proposed agreement with Ventec SW LLC.
  */
 import express from 'express';
-import {
-  GetPositionsByIds,
-  AddPosition,
-  UpdatePosition,
-  DeletePosition
-} from '../dbAccessFunctions/positionRecord.js';
+import { GetExpensesByIds, AddExpense, UpdateExpense, DeleteExpense } from '../dbAccessFunctions/expenseRecord.js';
 import { UpdateDeal, GetDealById } from '../dbAccessFunctions/dealRecord.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Get positions for a deal
-router.get('/api/position', authenticateToken, async (req, res) => {
+// Get expenses for a deal
+router.get('/api/expense', authenticateToken, async (req, res) => {
   try {
     const { dealId } = req.query;
     if (!dealId) return res.status(400).json({ error: 'dealId query parameter is required' });
     const deal = await GetDealById(dealId);
     if (!deal) return res.status(404).json({ error: 'Deal not found' });
-    const records = await GetPositionsByIds(deal.positions || []);
+    const records = await GetExpensesByIds(deal.expenses || []);
     res.json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Add a position and link it to a deal
-router.post('/api/position', authenticateToken, async (req, res) => {
+// Add an expense and link it to a deal
+router.post('/api/expense', authenticateToken, async (req, res) => {
   try {
-    const { dealId, ...posData } = req.body;
+    const { dealId, ...expData } = req.body;
     if (!dealId) return res.status(400).json({ error: 'dealId is required' });
+    if (!expData.officeAcronym) expData.officeAcronym = req.user.officeAcronym;
     const deal = await GetDealById(dealId);
-    posData.dealId = deal.entityId || "";
-    const record = await AddPosition(posData);
-    // Add position ID to the deal's positions array
-    const positions = deal.positions || [];
-    positions.push(record._id);
-    await UpdateDeal(dealId, { positions });
+    expData.dealId = deal.entityId || "";
+    const record = await AddExpense(expData);
+    const expenses = deal.expenses || [];
+    expenses.push(record._id);
+    await UpdateDeal(dealId, { expenses });
     res.status(201).json(record);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Update a position
-router.put('/api/position/:id', authenticateToken, async (req, res) => {
+// Update an expense
+router.put('/api/expense/:id', authenticateToken, async (req, res) => {
   try {
-    const record = await UpdatePosition(req.params.id, req.body);
-    if (!record) return res.status(404).json({ error: 'Position not found' });
+    const record = await UpdateExpense(req.params.id, req.body);
+    if (!record) return res.status(404).json({ error: 'Expense not found' });
     res.json(record);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Delete a position and unlink from deal
-router.delete('/api/position/:id', authenticateToken, async (req, res) => {
+// Delete an expense and unlink from deal
+router.delete('/api/expense/:id', authenticateToken, async (req, res) => {
   try {
     const { dealId } = req.query;
-    const record = await DeletePosition(req.params.id);
-    if (!record) return res.status(404).json({ error: 'Position not found' });
+    const record = await DeleteExpense(req.params.id);
+    if (!record) return res.status(404).json({ error: 'Expense not found' });
     if (dealId) {
       const deal = await GetDealById(dealId);
       if (deal) {
-        const positions = (deal.positions || []).filter(id => id.toString() !== req.params.id);
-        await UpdateDeal(dealId, { positions });
+        const expenses = (deal.expenses || []).filter(id => id.toString() !== req.params.id);
+        await UpdateDeal(dealId, { expenses });
       }
     }
-    res.json({ message: 'Position deleted', record });
+    res.json({ message: 'Expense deleted', record });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

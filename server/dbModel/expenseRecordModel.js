@@ -13,15 +13,20 @@
  * shall it be used for any purpose other than in connection with an
  * agreement or proposed agreement with Ventec SW LLC.
  */
+import mongoose from 'mongoose';
 
-export interface PositionRecord {
-  _id: string;
-  dealId: string;
-  position: number;
-  frequency: string;
-  funder: string;
-  monthlyPaymentAmount: number;
-  fundedDate: string;
-  status: boolean;  // true = Active, false = Inactive
-  officeAcronym: string;
-}
+const expenseSchema = new mongoose.Schema({
+  dealId: String,
+  expenseNumber: Number,
+  expenseDate: Date,
+  expenseDescription: String,
+  expenseAmount: Number,
+  expenseCategory: String,
+  officeAcronym: String,
+}, {
+  collection: "expenses"
+});
+
+const ExpensesModel = mongoose.model('Expenses', expenseSchema);
+
+export default ExpensesModel;

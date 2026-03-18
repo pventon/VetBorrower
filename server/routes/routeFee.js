@@ -14,74 +14,69 @@
  * agreement or proposed agreement with Ventec SW LLC.
  */
 import express from 'express';
-import {
-  GetPositionsByIds,
-  AddPosition,
-  UpdatePosition,
-  DeletePosition
-} from '../dbAccessFunctions/positionRecord.js';
+import { GetFeesByIds, AddFee, UpdateFee, DeleteFee } from '../dbAccessFunctions/feeRecord.js';
 import { UpdateDeal, GetDealById } from '../dbAccessFunctions/dealRecord.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Get positions for a deal
-router.get('/api/position', authenticateToken, async (req, res) => {
+// Get fees for a deal
+router.get('/api/fee', authenticateToken, async (req, res) => {
   try {
     const { dealId } = req.query;
     if (!dealId) return res.status(400).json({ error: 'dealId query parameter is required' });
     const deal = await GetDealById(dealId);
     if (!deal) return res.status(404).json({ error: 'Deal not found' });
-    const records = await GetPositionsByIds(deal.positions || []);
+    const records = await GetFeesByIds(deal.fees || []);
     res.json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Add a position and link it to a deal
-router.post('/api/position', authenticateToken, async (req, res) => {
+// Add a fee and link it to a deal
+router.post('/api/fee', authenticateToken, async (req, res) => {
   try {
-    const { dealId, ...posData } = req.body;
+    const { dealId, ...feeData } = req.body;
     if (!dealId) return res.status(400).json({ error: 'dealId is required' });
+    if (!feeData.officeAcronym) feeData.officeAcronym = req.user.officeAcronym;
     const deal = await GetDealById(dealId);
-    posData.dealId = deal.entityId || "";
-    const record = await AddPosition(posData);
-    // Add position ID to the deal's positions array
-    const positions = deal.positions || [];
-    positions.push(record._id);
-    await UpdateDeal(dealId, { positions });
+    feeData.dealId = deal.entityId || "";
+    const record = await AddFee(feeData);
+    const fees = deal.fees || [];
+    fees.push(record._id);
+    await UpdateDeal(dealId, { fees });
     res.status(201).json(record);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Update a position
-router.put('/api/position/:id', authenticateToken, async (req, res) => {
+// Update a fee
+router.put('/api/fee/:id', authenticateToken, async (req, res) => {
   try {
-    const record = await UpdatePosition(req.params.id, req.body);
-    if (!record) return res.status(404).json({ error: 'Position not found' });
+    const record = await UpdateFee(req.params.id, req.body);
+    if (!record) return res.status(404).json({ error: 'Fee not found' });
     res.json(record);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Delete a position and unlink from deal
-router.delete('/api/position/:id', authenticateToken, async (req, res) => {
+// Delete a fee and unlink from deal
+router.delete('/api/fee/:id', authenticateToken, async (req, res) => {
   try {
     const { dealId } = req.query;
-    const record = await DeletePosition(req.params.id);
-    if (!record) return res.status(404).json({ error: 'Position not found' });
+    const record = await DeleteFee(req.params.id);
+    if (!record) return res.status(404).json({ error: 'Fee not found' });
     if (dealId) {
       const deal = await GetDealById(dealId);
       if (deal) {
-        const positions = (deal.positions || []).filter(id => id.toString() !== req.params.id);
-        await UpdateDeal(dealId, { positions });
+        const fees = (deal.fees || []).filter(id => id.toString() !== req.params.id);
+        await UpdateDeal(dealId, { fees });
       }
     }
-    res.json({ message: 'Position deleted', record });
+    res.json({ message: 'Fee deleted', record });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

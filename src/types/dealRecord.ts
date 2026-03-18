@@ -71,6 +71,8 @@ export interface DealRecord {
   compoundCurrentRoi: number;
   compoundCurrentRoiOnCapital: number;
   positions: string[];
+  expenses: string[];
+  fees: string[];
   dealState: string;              // "dormant" | "active" | "completed" | "default" | "renewal"
   renewalDealId: string | null;    // ID of the renewal deal created from this deal
   parentDealId: string | null;     // ID of the parent deal this renewal was created from

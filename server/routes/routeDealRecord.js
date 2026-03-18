@@ -26,6 +26,8 @@ import { authenticateToken } from '../middleware/authMiddleware.js';
 import { getNextEntityId } from '../dbModel/counterModel.js';
 import { deriveDealState, applyDealState } from '../dbAccessFunctions/dealStateEngine.js';
 import { DeletePosition } from '../dbAccessFunctions/positionRecord.js';
+import { DeleteExpense } from '../dbAccessFunctions/expenseRecord.js';
+import { DeleteFee } from '../dbAccessFunctions/feeRecord.js';
 
 const router = express.Router();
 
@@ -155,6 +157,20 @@ router.delete('/api/deal/:id', authenticateToken, async (req, res) => {
     if (deal.positions && deal.positions.length > 0) {
       for (const posId of deal.positions) {
         await DeletePosition(posId);
+      }
+    }
+
+    // Delete all associated expenses
+    if (deal.expenses && deal.expenses.length > 0) {
+      for (const expId of deal.expenses) {
+        await DeleteExpense(expId);
+      }
+    }
+
+    // Delete all associated fees
+    if (deal.fees && deal.fees.length > 0) {
+      for (const feeId of deal.fees) {
+        await DeleteFee(feeId);
       }
     }
 
