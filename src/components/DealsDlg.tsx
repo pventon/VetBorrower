@@ -1162,7 +1162,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             })()} />
                         </div>
                     </div>
-                    <div className="form-row" title="Calculated: (Total Payback w/ Fees & Expenses - Total Cash Out) / Total Cash Out x 100">
+                    {formData.typeOfDeal !== "renewal" && (
+                    <>
+                    <div className="form-row" title="Calculated: (Total Payback w/ Fees & Expenses - Total Cash Out) / Total Cash Out x 100. Only shown for new deals; renewals use the Compound Performance metrics below.">
                         <label>Expected ROI</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">%</span>
@@ -1180,7 +1182,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             })()} />
                         </div>
                     </div>
-                    <div className="form-row" title="Calculated: (Amount Paid In - Total Cash Out) / Total Cash Out x 100">
+                    <div className="form-row" title="Calculated: (Amount Paid In - Total Cash Out) / Total Cash Out x 100. Only shown for new deals; renewals use the Compound Performance metrics below.">
                         <label>Current ROI</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">%</span>
@@ -1195,6 +1197,8 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             })()} />
                         </div>
                     </div>
+                    </>
+                    )}
                 </div>
             </div>
 
@@ -1696,15 +1700,22 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             const netFunded = deal.netFundedAmount || ((deal.fundedAmount || 0) - (deal.originationFee || 0));
                                             const comm = deal.brokerCommission || ((deal.brokerFee || 0) / 100 * (deal.fundedAmount || 0));
                                             const expenses = deal.miscellaneousExpenses || 0;
-                                            const totalCashOut = netFunded + comm + expenses;
+                                            const isRenewal = deal.typeOfDeal === "renewal";
+                                            const rolledBalance = deal.rolledBalance || 0;
+                                            const costBasis = isRenewal
+                                                ? (netFunded - rolledBalance) + comm + expenses
+                                                : netFunded + comm + expenses;
                                             const payback = (deal.fundedAmount || 0) * (deal.factorRate || 0) + (deal.miscellaneousFees || 0) + expenses - (deal.discount || 0);
-                                            const expectedRoi = totalCashOut > 0 ? ((payback - totalCashOut) / totalCashOut * 100) : 0;
+                                            const expectedRoi = costBasis > 0 ? ((payback - costBasis) / costBasis * 100) : 0;
                                             const paidIn = deal.amountPaidIn || 0;
-                                            const currentRoi = totalCashOut > 0 ? ((paidIn - totalCashOut) / totalCashOut * 100) : 0;
+                                            const currentRoi = costBasis > 0 ? ((paidIn - costBasis) / costBasis * 100) : 0;
+                                            const tooltip = isRenewal
+                                                ? "ROI based on Total Net New Cash Out (Net New Cash Out + Broker Commission + Misc Expenses)"
+                                                : "ROI based on Total Cash Out (Net Funded + Broker Commission + Misc Expenses)";
                                             return (
                                                 <>
-                                                    <td style={{ textAlign: "center", color: expectedRoi < 0 ? "#c62828" : undefined }}>{expectedRoi !== 0 ? expectedRoi.toFixed(2) + "%" : "-"}</td>
-                                                    <td style={{ textAlign: "center", color: currentRoi < 0 ? "#c62828" : undefined }}>{currentRoi !== 0 ? currentRoi.toFixed(2) + "%" : "-"}</td>
+                                                    <td style={{ textAlign: "center", color: expectedRoi < 0 ? "#c62828" : undefined }} title={tooltip}>{expectedRoi !== 0 ? expectedRoi.toFixed(2) + "%" : "-"}</td>
+                                                    <td style={{ textAlign: "center", color: currentRoi < 0 ? "#c62828" : undefined }} title={tooltip}>{currentRoi !== 0 ? currentRoi.toFixed(2) + "%" : "-"}</td>
                                                 </>
                                             );
                                         })()}
