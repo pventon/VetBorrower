@@ -1265,7 +1265,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 </div>
                             </div>
                             <div className="form-row" title="Calculated: Net Funded Amount - Rolled Balance. The actual new cash disbursed to the client">
-                                <label>Net New Cash Out</label>
+                                <label>Net New Cash Out to Client</label>
                                 <div className="input-prefixed">
                                     <span className="input-prefix-symbol">$</span>
                                     <ReadOnlyInput value={(() => {
@@ -1277,7 +1277,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 </div>
                             </div>
                             <div className="form-row" title="Calculated: Net New Cash Out + Broker Commission">
-                                <label>Total Net New Cash Out</label>
+                                <label>Total Net New Cash Out + Broker Commission</label>
                                 <div className="input-prefixed">
                                     <span className="input-prefix-symbol">$</span>
                                     <ReadOnlyInput value={(() => {
@@ -1432,9 +1432,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <table className="ledger-table">
                             <thead>
                                 <tr>
-                                    <th style={{ textAlign: "left" }}>Deal</th>
+                                    <th>Deal</th>
                                     <th>Type</th>
                                     <th>Funded</th>
+                                    <th>Net<br/>Funded</th>
                                     <th>Rolled<br/>Balance</th>
                                     <th>Net Funded +<br/>Broker Commission</th>
                                     <th>Broker<br/>Commission</th>
@@ -1462,6 +1463,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             <td style={{ textAlign: "left" }}>{d.entityId ?? "-"}</td>
                                             <td style={{ textTransform: "capitalize" }}>{d.typeOfDeal ?? "-"}</td>
                                             <td>{formatCurrency(d.fundedAmount)}</td>
+                                            <td>{formatCurrency(d.typeOfDeal === "renewal"
+                                                ? (d.netFundedAmount || ((d.fundedAmount || 0) - (d.originationFee || 0))) - (d.rolledBalance || 0)
+                                                : (d.netFundedAmount || ((d.fundedAmount || 0) - (d.originationFee || 0))))}</td>
                                             <td>{d.rolledBalance ? formatCurrency(d.rolledBalance) : "-"}</td>
                                             <td>{formatCurrency(netNew)}</td>
                                             <td>{formatCurrency(d.brokerCommission || 0)}</td>
@@ -1499,6 +1503,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             <td style={{ textAlign: "left" }}>Totals (per deal)</td>
                                             <td></td>
                                             <td>{formatCurrency(compoundTotalFunded)}</td>
+                                            <td>{formatCurrency(chain.reduce((s, d) => {
+                                                const nf = d.netFundedAmount || ((d.fundedAmount || 0) - (d.originationFee || 0));
+                                                return s + (d.typeOfDeal === "renewal" ? nf - (d.rolledBalance || 0) : nf);
+                                            }, 0))}</td>
                                             <td>{formatCurrency(totalRolledBalance)}</td>
                                             <td>{formatCurrency(compoundNetNewCapital)}</td>
                                             <td>{formatCurrency(chain.reduce((s, d) => s + (d.brokerCommission || 0), 0))}</td>
