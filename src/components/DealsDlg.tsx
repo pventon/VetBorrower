@@ -645,6 +645,22 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const handleDelete = async (deal: DealRecord) => {
         if (!confirm(`Delete this deal?`)) return;
         try {
+            // If this is a renewal, clear the parent deal's settledByRenewal and renewalDealId
+            if (deal.parentDealId) {
+                const parentDeal = deals.find(d => d._id === deal.parentDealId);
+                if (parentDeal) {
+                    await fetch(`${API_BASE}/api/deal/${deal.parentDealId}`, {
+                        method: "PUT",
+                        headers: { ...headers, "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            ...parentDeal,
+                            settledByRenewal: 0,
+                            renewalDealId: null,
+                            dealState: "active",
+                        }),
+                    });
+                }
+            }
             const res = await fetch(`${API_BASE}/api/deal/${deal._id}?corporationId=${selectedCorpId}`, {
                 method: "DELETE",
                 headers,
@@ -1417,10 +1433,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 const compoundTotalCollected = compoundTotalPaidIn;
                 const compoundNetNewCapital = chain.reduce((s, d) => s + calcDealNetNewCapital(d), 0);
                 const compoundTotalNetNewCashOut = chain.reduce((s, d) => s + calcDealTotalNetNewCashOut(d), 0);
-                const compoundExpectedProfit = compoundTotalPayback - compoundTotalNetNewCashOut;
                 const compoundCurrentProfit = compoundTotalCollected - compoundTotalNetNewCashOut;
-                const compoundExpectedRoi = compoundTotalNetNewCashOut > 0 ? (compoundExpectedProfit / compoundTotalNetNewCashOut * 100) : 0;
-                const compoundExpectedRoiOnCapital = compoundNetNewCapital > 0 ? (compoundExpectedProfit / compoundNetNewCapital * 100) : 0;
                 const compoundCurrentRoi = compoundTotalNetNewCashOut > 0 ? (compoundCurrentProfit / compoundTotalNetNewCashOut * 100) : 0;
                 const compoundCurrentRoiOnCapital = compoundNetNewCapital > 0 ? (compoundCurrentProfit / compoundNetNewCapital * 100) : 0;
 
@@ -1440,6 +1453,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     <th>Funded</th>
                                     <th>Rolled Balance</th>
                                     <th>Net New Capital</th>
+                                    <th>Broker Commission</th>
                                     <th>Total Payback</th>
                                     <th>Paid In</th>
                                     <th>Rolled Over</th>
@@ -1465,6 +1479,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             <td>{formatCurrency(d.fundedAmount)}</td>
                                             <td>{d.rolledBalance ? formatCurrency(d.rolledBalance) : "-"}</td>
                                             <td>{formatCurrency(netNew)}</td>
+                                            <td>{formatCurrency(d.brokerCommission || 0)}</td>
                                             <td>{formatCurrency(totalPB)}</td>
                                             <td>{formatCurrency(paidIn)}</td>
                                             <td>{settled ? formatCurrency(settled) : "-"}</td>
@@ -1482,8 +1497,6 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                         const owed = calcDealTotalPaybackWithFees(d) - (d.amountPaidIn || 0);
                                         return s + (owed > 0 ? owed : 0);
                                     }, 0);
-                                    const capitalRecovery = totalRolledBalance;
-                                    const adjustedProfit = totalLedgerProfit + capitalRecovery;
                                     return (
                                         <>
                                         <tr className="ledger-totals">
@@ -1492,6 +1505,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             <td>{formatCurrency(compoundTotalFunded)}</td>
                                             <td>{formatCurrency(totalRolledBalance)}</td>
                                             <td>{formatCurrency(compoundNetNewCapital)}</td>
+                                            <td>{formatCurrency(chain.reduce((s, d) => s + (d.brokerCommission || 0), 0))}</td>
                                             <td>{formatCurrency(compoundTotalPayback)}</td>
                                             <td>{formatCurrency(compoundTotalPaidIn)}</td>
                                             <td>{formatCurrency(totalSettled)}</td>
@@ -1499,32 +1513,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             <td style={{ color: totalLedgerProfit >= 0 ? "#2e7d32" : "#c62828" }}>{formatCurrency(totalLedgerProfit)}</td>
                                             <td></td>
                                         </tr>
-                                        <tr className="ledger-totals" style={{ borderTop: "1px solid #7a8fa6" }}>
-                                            <td style={{ textAlign: "left" }} colSpan={8}>Capital recovered via renewals (rolled balance recycled)</td>
-                                            <td></td>
-                                            <td style={{ color: "#2e7d32" }}>+{formatCurrency(capitalRecovery)}</td>
-                                            <td></td>
-                                        </tr>
-                                        <tr className="ledger-totals" style={{ background: "#e3edf7" }}>
-                                            <td style={{ textAlign: "left" }} colSpan={8}><strong>Adjusted Compound Profit</strong></td>
-                                            <td></td>
-                                            <td style={{ color: adjustedProfit >= 0 ? "#2e7d32" : "#c62828" }}><strong>{formatCurrency(adjustedProfit)}</strong></td>
-                                            <td></td>
-                                        </tr>
                                         </>
                                     );
                                 })()}
                             </tbody>
                         </table>
-                        <div className="compound-metrics">
-                            <div className="compound-metric-card">
-                                <div className="metric-label">Expected ROI (on Cash Out)</div>
-                                <div className={`metric-value ${compoundExpectedRoi >= 0 ? "positive" : "negative"}`}>{compoundExpectedRoi.toFixed(2)}%</div>
-                            </div>
-                            <div className="compound-metric-card">
-                                <div className="metric-label">Expected ROI (on Net Capital)</div>
-                                <div className={`metric-value ${compoundExpectedRoiOnCapital >= 0 ? "positive" : "negative"}`}>{compoundExpectedRoiOnCapital.toFixed(2)}%</div>
-                            </div>
+                        <div className="compound-metrics" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
                             <div className="compound-metric-card">
                                 <div className="metric-label">Current ROI (on Cash Out)</div>
                                 <div className={`metric-value ${compoundCurrentRoi >= 0 ? "positive" : "negative"}`}>{compoundCurrentRoi.toFixed(2)}%</div>
@@ -1532,12 +1526,6 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             <div className="compound-metric-card">
                                 <div className="metric-label">Current ROI (on Net Capital)</div>
                                 <div className={`metric-value ${compoundCurrentRoiOnCapital >= 0 ? "positive" : "negative"}`}>{compoundCurrentRoiOnCapital.toFixed(2)}%</div>
-                            </div>
-                        </div>
-                        <div className="compound-metrics" style={{ gridTemplateColumns: "repeat(2, 1fr)", marginTop: "0.25rem" }}>
-                            <div className="compound-metric-card">
-                                <div className="metric-label">Expected Compound Profit</div>
-                                <div className={`metric-value ${compoundExpectedProfit >= 0 ? "positive" : "negative"}`}>{formatCurrency(compoundExpectedProfit)}</div>
                             </div>
                             <div className="compound-metric-card">
                                 <div className="metric-label">Current Compound Profit</div>
