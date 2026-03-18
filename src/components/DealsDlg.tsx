@@ -1163,25 +1163,6 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         </div>
                     </div>
                     {formData.typeOfDeal !== "renewal" && (
-                    <>
-                    <div className="form-row" title="Calculated: (Total Payback w/ Fees & Expenses - Total Cash Out) / Total Cash Out x 100. Only shown for new deals; renewals use the Compound Performance metrics below.">
-                        <label>Expected ROI</label>
-                        <div className="input-prefixed">
-                            <span className="input-prefix-symbol">%</span>
-                            <ReadOnlyInput value={(() => {
-                                const payback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
-                                const fees = parseFloat(stripCommas(formData.miscellaneousFees)) || 0;
-                                const expenses = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
-                                const disc = parseFloat(stripCommas(formData.discount)) || 0;
-                                const totalWithFees = payback + fees + expenses - disc;
-                                const netFunded = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
-                                const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
-                                const totalCashOut = netFunded + comm + expenses;
-                                if (totalCashOut <= 0) return "";
-                                return ((totalWithFees - totalCashOut) / totalCashOut * 100).toFixed(2);
-                            })()} />
-                        </div>
-                    </div>
                     <div className="form-row" title="Calculated: (Amount Paid In - Total Cash Out) / Total Cash Out x 100. Only shown for new deals; renewals use the Compound Performance metrics below.">
                         <label>Current ROI</label>
                         <div className="input-prefixed">
@@ -1197,7 +1178,6 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             })()} />
                         </div>
                     </div>
-                    </>
                     )}
                 </div>
             </div>
@@ -1455,14 +1435,15 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     <th style={{ textAlign: "left" }}>Deal</th>
                                     <th>Type</th>
                                     <th>Funded</th>
-                                    <th>Rolled Balance</th>
-                                    <th>Net New Capital</th>
-                                    <th>Broker Commission</th>
-                                    <th>Total Payback</th>
+                                    <th>Rolled<br/>Balance</th>
+                                    <th>Net Funded +<br/>Broker Commission</th>
+                                    <th>Broker<br/>Commission</th>
+                                    <th>Total<br/>Payback</th>
                                     <th>Paid In</th>
-                                    <th>Rolled Over</th>
+                                    <th>Rolled<br/>Over</th>
                                     <th>Outstanding</th>
                                     <th>Profit</th>
+                                    <th>Current<br/>ROI</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -1489,6 +1470,17 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             <td>{settled ? formatCurrency(settled) : "-"}</td>
                                             <td style={{ color: outstanding > 0 ? "#c62828" : undefined }}>{formatCurrency(outstanding > 0 ? outstanding : 0)}</td>
                                             <td style={{ color: profit >= 0 ? "#2e7d32" : "#c62828" }}>{formatCurrency(profit)}</td>
+                                            {(() => {
+                                                const isRenewal = d.typeOfDeal === "renewal";
+                                                const netFunded = d.netFundedAmount || ((d.fundedAmount || 0) - (d.originationFee || 0));
+                                                const comm = d.brokerCommission || 0;
+                                                const expenses = d.miscellaneousExpenses || 0;
+                                                const costBasis = isRenewal
+                                                    ? (netFunded - (d.rolledBalance || 0)) + comm + expenses
+                                                    : netFunded + comm + expenses;
+                                                const roi = costBasis > 0 ? ((paidIn - costBasis) / costBasis * 100) : 0;
+                                                return <td style={{ textAlign: "center", color: roi < 0 ? "#c62828" : roi > 0 ? "#2e7d32" : undefined }}>{roi !== 0 ? roi.toFixed(2) + "%" : "-"}</td>;
+                                            })()}
                                             <td style={{ textTransform: "capitalize" }}>{d.dealState ?? "-"}</td>
                                         </tr>
                                     );
@@ -1515,6 +1507,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             <td>{formatCurrency(totalSettled)}</td>
                                             <td style={{ color: totalOutstanding > 0 ? "#c62828" : undefined }}>{formatCurrency(totalOutstanding)}</td>
                                             <td style={{ color: totalLedgerProfit >= 0 ? "#2e7d32" : "#c62828" }}>{formatCurrency(totalLedgerProfit)}</td>
+                                            <td></td>
                                             <td></td>
                                         </tr>
                                         </>
@@ -1669,7 +1662,6 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     <th style={{ textAlign: "center" }}>Total<br/>Payback</th>
                                     <th style={{ textAlign: "center" }}>Rx'd to<br/>Date</th>
                                     <th style={{ textAlign: "center" }}>Outstanding</th>
-                                    <th style={{ textAlign: "center" }}>Expected<br/>ROI</th>
                                     <th style={{ textAlign: "center" }}>Current<br/>ROI</th>
                                     <th style={{ textAlign: "center" }}>Actions</th>
                                 </tr>
@@ -1705,18 +1697,13 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             const costBasis = isRenewal
                                                 ? (netFunded - rolledBalance) + comm + expenses
                                                 : netFunded + comm + expenses;
-                                            const payback = (deal.fundedAmount || 0) * (deal.factorRate || 0) + (deal.miscellaneousFees || 0) + expenses - (deal.discount || 0);
-                                            const expectedRoi = costBasis > 0 ? ((payback - costBasis) / costBasis * 100) : 0;
                                             const paidIn = deal.amountPaidIn || 0;
                                             const currentRoi = costBasis > 0 ? ((paidIn - costBasis) / costBasis * 100) : 0;
                                             const tooltip = isRenewal
                                                 ? "ROI based on Total Net New Cash Out (Net New Cash Out + Broker Commission + Misc Expenses)"
                                                 : "ROI based on Total Cash Out (Net Funded + Broker Commission + Misc Expenses)";
                                             return (
-                                                <>
-                                                    <td style={{ textAlign: "center", color: expectedRoi < 0 ? "#c62828" : undefined }} title={tooltip}>{expectedRoi !== 0 ? expectedRoi.toFixed(2) + "%" : "-"}</td>
                                                     <td style={{ textAlign: "center", color: currentRoi < 0 ? "#c62828" : undefined }} title={tooltip}>{currentRoi !== 0 ? currentRoi.toFixed(2) + "%" : "-"}</td>
-                                                </>
                                             );
                                         })()}
                                         <td className="action-cell">
@@ -1727,7 +1714,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     </tr>
                                 ))}
                                 {deals.length === 0 && (
-                                    <tr><td colSpan={15} className="empty-row">No deals found for this corporation</td></tr>
+                                    <tr><td colSpan={14} className="empty-row">No deals found for this corporation</td></tr>
                                 )}
                             </tbody>
                         </table>
