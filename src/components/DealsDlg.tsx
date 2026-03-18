@@ -1079,6 +1079,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             />
                         </div>
                     </div>
+                    {formData.typeOfDeal !== "renewal" && (
                     <div className="form-row" title="Calculated: Net Funded Amount + Broker Commission + Miscellaneous Expenses">
                         <label>Total Cash Out</label>
                         <div className="input-prefixed">
@@ -1092,6 +1093,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             })()} />
                         </div>
                     </div>
+                    )}
                     <div className="form-row" title="Calculated: Total Payback + Miscellaneous Fees + Miscellaneous Expenses - Discount">
                         <label>Total Payback w/ Fees &amp; Expenses</label>
                         <div className="input-prefixed">
@@ -1124,6 +1126,18 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             />
                         </div>
                     </div>
+                    <div className="form-row" title="Calculated: (Amount Paid In / Total Payback) x 100">
+                        <label>% Paid In</label>
+                        <div className="input-prefixed">
+                            <span className="input-prefix-symbol">%</span>
+                            <ReadOnlyInput value={(() => {
+                                const paidIn = parseFloat(stripCommas(formData.amountPaidIn)) || 0;
+                                const totalPayback = parseFloat(stripCommas(formData.totalPaybackAmount)) || 0;
+                                if (totalPayback <= 0) return "";
+                                return (paidIn / totalPayback * 100).toFixed(2);
+                            })()} />
+                        </div>
+                    </div>
                     <div className="form-row" title="Amount settled by the renewal deal's rolled balance. Auto-populated when a renewal is created">
                         <label>Settled by Renewal</label>
                         <div className="input-prefixed">
@@ -1147,7 +1161,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                             })()} />
                         </div>
                     </div>
-                    <div className="form-row" title="Calculated: Amount Paid In - Total Cash Out">
+                    <div className="form-row" title={formData.typeOfDeal === "renewal"
+                        ? "Calculated: Amount Paid In - (Total Net New Cash Out + Broker Commission)"
+                        : "Calculated: Amount Paid In - Total Cash Out"}>
                         <label>Net Profit</label>
                         <div className="input-prefixed">
                             <span className="input-prefix-symbol">$</span>
@@ -1156,9 +1172,13 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                 const net = parseFloat(stripCommas(formData.netFundedAmount)) || 0;
                                 const comm = parseFloat(stripCommas(formData.brokerCommission)) || 0;
                                 const misc = parseFloat(stripCommas(formData.miscellaneousExpenses)) || 0;
-                                const totalCashOut = net + comm + misc;
-                                if (paidIn <= 0 && totalCashOut <= 0) return "";
-                                return formatDollar((paidIn - totalCashOut).toFixed(2));
+                                const rolled = parseFloat(stripCommas(formData.rolledBalance)) || 0;
+                                const isRenewal = formData.typeOfDeal === "renewal";
+                                const costBasis = isRenewal
+                                    ? (net - rolled) + comm
+                                    : net + comm + misc;
+                                if (paidIn <= 0 && costBasis <= 0) return "";
+                                return formatDollar((paidIn - costBasis).toFixed(2));
                             })()} />
                         </div>
                     </div>
@@ -1441,6 +1461,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                     <th>Broker<br/>Commission</th>
                                     <th>Total<br/>Payback</th>
                                     <th>Paid In</th>
+                                    <th>%<br/>Paid In</th>
                                     <th>Rolled<br/>Over</th>
                                     <th>Outstanding</th>
                                     <th>Profit</th>
@@ -1471,6 +1492,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             <td>{formatCurrency(d.brokerCommission || 0)}</td>
                                             <td>{formatCurrency(totalPB)}</td>
                                             <td>{formatCurrency(paidIn)}</td>
+                                            <td style={{ textAlign: "center" }}>{totalPB > 0 ? (paidIn / totalPB * 100).toFixed(2) + "%" : "-"}</td>
                                             <td>{settled ? formatCurrency(settled) : "-"}</td>
                                             <td style={{ color: outstanding > 0 ? "#c62828" : undefined }}>{formatCurrency(outstanding > 0 ? outstanding : 0)}</td>
                                             <td style={{ color: profit >= 0 ? "#2e7d32" : "#c62828" }}>{formatCurrency(profit)}</td>
@@ -1512,6 +1534,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                                             <td>{formatCurrency(chain.reduce((s, d) => s + (d.brokerCommission || 0), 0))}</td>
                                             <td>{formatCurrency(compoundTotalPayback)}</td>
                                             <td>{formatCurrency(compoundTotalPaidIn)}</td>
+                                            <td style={{ textAlign: "center" }}>{compoundTotalPayback > 0 ? (compoundTotalPaidIn / compoundTotalPayback * 100).toFixed(2) + "%" : "-"}</td>
                                             <td>{formatCurrency(totalSettled)}</td>
                                             <td style={{ color: totalOutstanding > 0 ? "#c62828" : undefined }}>{formatCurrency(totalOutstanding)}</td>
                                             <td style={{ color: totalLedgerProfit >= 0 ? "#2e7d32" : "#c62828" }}>{formatCurrency(totalLedgerProfit)}</td>
