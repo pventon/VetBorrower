@@ -73,6 +73,7 @@ export interface DealRecord {
   positions: string[];
   expenses: string[];
   fees: string[];
+  documents: string[];
   dealState: string;              // "dormant" | "active" | "completed" | "default" | "renewal"
   renewalDealId: string | null;    // ID of the renewal deal created from this deal
   parentDealId: string | null;     // ID of the parent deal this renewal was created from

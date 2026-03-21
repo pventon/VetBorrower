@@ -46,6 +46,12 @@ const FeeCategory = new mongoose.Schema({
   officeAcronym: String,
 }, { _id: false });
 
+const OcrFieldMapping = new mongoose.Schema({
+  documentLabels: String,    // Pipe-separated aliases, e.g. "Funded Amount|Fund Amt"
+  dealField: String,         // Target field key, e.g. "fundedAmount"
+  fieldLabel: String,        // Human-readable field name, e.g. "Funded Amount ($)"
+}, { _id: false });
+
 // Define the settings schema
 const settingsSchema = new mongoose.Schema({
   // ************************************************************************
@@ -80,6 +86,8 @@ const settingsSchema = new mongoose.Schema({
   expenseCategories: [ExpenseCategory],
 
   feeCategories: [FeeCategory],
+
+  ocrFieldMappings: [OcrFieldMapping],
   // ************************************************************************
 
   // Internal record data

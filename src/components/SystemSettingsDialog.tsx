@@ -16,7 +16,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
-import type { SettingsRecord, IndustryType, UsState, UserRole, ExpenseCategory, FeeCategory } from "../types/settingsRecord";
+import type { SettingsRecord, IndustryType, UsState, UserRole, ExpenseCategory, FeeCategory, OcrFieldMapping } from "../types/settingsRecord";
 import type { FunderRecord } from "../types/funderRecord";
 
 const API_BASE =
@@ -28,7 +28,7 @@ interface SystemSettingsDialogProps {
     onClose: () => void;
 }
 
-type TabName = "general" | "industryTypes" | "usStates" | "userRoles" | "funders" | "expenseCategories" | "feeCategories";
+type TabName = "general" | "industryTypes" | "usStates" | "userRoles" | "funders" | "expenseCategories" | "feeCategories" | "ocrFieldMappings";
 
 export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogProps) {
     const { token, hasRole, user: currentUser } = useAuth();
@@ -59,6 +59,7 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
     // Expense & Fee Categories (stored in settings arrays)
     const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
     const [feeCategories, setFeeCategories] = useState<FeeCategory[]>([]);
+    const [ocrFieldMappings, setOcrFieldMappings] = useState<OcrFieldMapping[]>([]);
 
     useEffect(() => {
         if (settings) {
@@ -70,6 +71,7 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
             setUserRoles([...settings.userRoles]);
             setExpenseCategories([...(settings.expenseCategories || [])]);
             setFeeCategories([...(settings.feeCategories || [])]);
+            setOcrFieldMappings([...(settings.ocrFieldMappings || [])]);
         }
     }, [settings]);
 
@@ -187,6 +189,7 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
             userRoles,
             expenseCategories,
             feeCategories,
+            ocrFieldMappings,
         };
 
         try {
@@ -233,6 +236,32 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
         setUserRoles(updated);
     };
 
+    // OCR Field Mapping helpers
+    const dealFieldOptions = [
+        { key: "fundedAmount", label: "Funded Amount ($)" },
+        { key: "fundedDate", label: "Funded Date" },
+        { key: "originationFeePercent", label: "Origination Fee (%)" },
+        { key: "originationFee", label: "Origination Fee ($)" },
+        { key: "buyRate", label: "Buy Rate" },
+        { key: "brokerFee", label: "Broker Fee (%)" },
+        { key: "loanTerm", label: "Loan Term (days)" },
+        { key: "paymentFrequency", label: "Payment Frequency" },
+        { key: "position", label: "Position" },
+        { key: "mcaHistory", label: "MCA History" },
+    ];
+    const addOcrMapping = () => setOcrFieldMappings([...ocrFieldMappings, { documentLabels: "", dealField: "", fieldLabel: "" }]);
+    const removeOcrMapping = (i: number) => setOcrFieldMappings(ocrFieldMappings.filter((_, idx) => idx !== i));
+    const updateOcrMapping = (i: number, field: keyof OcrFieldMapping, value: string) => {
+        const updated = [...ocrFieldMappings];
+        updated[i] = { ...updated[i], [field]: value };
+        // Auto-fill fieldLabel when dealField is selected
+        if (field === "dealField") {
+            const opt = dealFieldOptions.find(o => o.key === value);
+            if (opt) updated[i].fieldLabel = opt.label;
+        }
+        setOcrFieldMappings(updated);
+    };
+
     const tabs: { key: TabName; label: string }[] = [
         ...(hasRole("root") ? [{ key: "general" as TabName, label: "General" }] : []),
         { key: "industryTypes", label: "Industry Types" },
@@ -241,6 +270,7 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
         { key: "expenseCategories", label: "Expense Categories" },
         { key: "feeCategories", label: "Fee Categories" },
         ...(hasRole("root") ? [{ key: "userRoles" as TabName, label: "User Roles" }] : []),
+        ...(hasRole("root") ? [{ key: "ocrFieldMappings" as TabName, label: "OCR Field Mapping" }] : []),
     ];
 
     return (
@@ -542,6 +572,52 @@ export default function SystemSettingsDialog({ onClose }: SystemSettingsDialogPr
                                                 </td>
                                                 <td>
                                                     <button className="btn btn-sm btn-danger" onClick={() => removeUserRole(i)}>Remove</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {activeTab === "ocrFieldMappings" && (
+                            <div>
+                                <p style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+                                    Map document text labels to deal fields. Use <code>|</code> to separate aliases (e.g. "Funded Amount|Fund Amt|Funding Amount").
+                                </p>
+                                <button className="btn btn-sm" onClick={addOcrMapping}>Add Mapping</button>
+                                <table className="dialog-table settings-array-table" style={{ marginTop: 8 }}>
+                                    <thead>
+                                        <tr>
+                                            <th>Document Label(s)</th>
+                                            <th>Deal Field</th>
+                                            <th>Field Label</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {ocrFieldMappings.map((m, i) => (
+                                            <tr key={i}>
+                                                <td>
+                                                    <input type="text" value={m.documentLabels}
+                                                        onChange={(e) => updateOcrMapping(i, "documentLabels", e.target.value)}
+                                                        placeholder="Funded Amount|Fund Amt" />
+                                                </td>
+                                                <td>
+                                                    <select value={m.dealField}
+                                                        onChange={(e) => updateOcrMapping(i, "dealField", e.target.value)}>
+                                                        <option value="">-- Select --</option>
+                                                        {dealFieldOptions.map(o => (
+                                                            <option key={o.key} value={o.key}>{o.label}</option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <input type="text" value={m.fieldLabel}
+                                                        onChange={(e) => updateOcrMapping(i, "fieldLabel", e.target.value)} />
+                                                </td>
+                                                <td>
+                                                    <button className="btn btn-sm btn-danger" onClick={() => removeOcrMapping(i)}>Remove</button>
                                                 </td>
                                             </tr>
                                         ))}

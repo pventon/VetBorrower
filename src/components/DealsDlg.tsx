@@ -22,6 +22,7 @@ import type { PositionRecord } from "../types/positionRecord";
 import type { ExpenseRecord } from "../types/expenseRecord";
 import type { FeeRecord } from "../types/feeRecord";
 import type { FunderRecord } from "../types/funderRecord";
+import type { DocumentRecord } from "../types/documentRecord";
 import ComboBox from "../customwidgets/ComboBox";
 
 const API_BASE =
@@ -180,9 +181,9 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const [isAddingExpense, setIsAddingExpense] = useState(false);
     const [isAddingFee, setIsAddingFee] = useState(false);
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
-        clientFinancials: true, dealDetails: true, funding: true, ratesTerms: true,
-        costsFees: true, expenses: true, fees: true, performance: true,
-        default: true, renewal: true, compound: true, positions: true,
+        clientFinancials: false, dealDetails: false, funding: false, ratesTerms: false,
+        costsFees: false, expenses: false, fees: false, performance: false,
+        default: false, renewal: false, compound: false, documents: false, positions: false,
     });
     const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
     const [editingFeeId, setEditingFeeId] = useState<string | null>(null);
@@ -191,6 +192,12 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
     const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
     const [feeCategories, setFeeCategories] = useState<string[]>([]);
     const [showCompoundInfo, setShowCompoundInfo] = useState(false);
+    const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+    const [showCreateFromDoc, setShowCreateFromDoc] = useState(false);
+    const [docMappingText, setDocMappingText] = useState("");
+    const [docMappingFileName, setDocMappingFileName] = useState("");
+    const [docMappingDocId, setDocMappingDocId] = useState("");
+    const [docMappingFields, setDocMappingFields] = useState<Record<string, string>>({});
 
     const headers = {
         "Content-Type": "application/json",
@@ -250,6 +257,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             setFormData(f => ({ ...f, miscellaneousFees: feeTotal > 0 ? formatDollar(feeTotal.toFixed(2)) : "" }));
         }
     }, [fees]);
+
 
     const fetchDeals = async (corpId: string) => {
         if (!corpId) { setDeals([]); return; }
@@ -359,10 +367,11 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             currentRoi: deal.currentRoi?.toFixed(2) ?? "",
         });
         setFormError(null);
-        // Fetch positions, expenses, and fees for this deal
+        // Fetch positions, expenses, fees, and documents for this deal
         fetchPositions(deal._id);
         fetchExpenses(deal._id);
         fetchFees(deal._id);
+        fetchDocuments(deal._id);
     };
 
     const cancelForm = () => {
@@ -378,6 +387,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
         setIsAddingFee(false);
         setEditingExpenseId(null);
         setEditingFeeId(null);
+        setDocuments([]);
     };
 
     const fetchPositions = async (dealId: string) => {
@@ -399,6 +409,189 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
             const res = await fetch(`${API_BASE}/api/fee?dealId=${dealId}`, { headers });
             if (res.ok) setFees(await res.json());
         } catch { /* ignore */ }
+    };
+
+    const fetchDocuments = async (dealId: string) => {
+        try {
+            const res = await fetch(`${API_BASE}/api/document?dealId=${dealId}`, { headers });
+            if (res.ok) setDocuments(await res.json());
+        } catch { /* ignore */ }
+    };
+
+    const handleUploadDocument = async (file: File) => {
+        const dealId = editingDeal?._id;
+        if (!dealId) return;
+        const formPayload = new FormData();
+        formPayload.append("file", file);
+        formPayload.append("dealId", dealId);
+        formPayload.append("officeAcronym", currentUser?.officeAcronym || "");
+        try {
+            const res = await fetch(`${API_BASE}/api/document`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                body: formPayload,
+            });
+            if (res.ok) await fetchDocuments(dealId);
+        } catch { /* ignore */ }
+    };
+
+    const handleDeleteDocument = async (docId: string) => {
+        const dealId = editingDeal?._id;
+        if (!dealId) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/document/${docId}?dealId=${dealId}`, {
+                method: "DELETE", headers
+            });
+            if (res.ok) await fetchDocuments(dealId);
+        } catch { /* ignore */ }
+    };
+
+    const handleDownloadDocument = async (doc: DocumentRecord) => {
+        try {
+            const res = await fetch(`${API_BASE}/api/document/${doc._id}/download`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) return;
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = doc.originalName;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch { /* ignore */ }
+    };
+
+    const handleViewDocument = async (doc: DocumentRecord) => {
+        try {
+            const res = await fetch(`${API_BASE}/api/document/${doc._id}/view`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) return;
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            window.open(url, "_blank");
+        } catch { /* ignore */ }
+    };
+
+    const handleUploadForMapping = async (file: File) => {
+        const formPayload = new FormData();
+        formPayload.append("file", file);
+        formPayload.append("officeAcronym", currentUser?.officeAcronym || "");
+        setDocMappingText("Uploading and extracting text...");
+        setDocMappingFileName(file.name);
+        setShowCreateFromDoc(true);
+        setDocMappingFields({});
+        setDocMappingDocId("");
+        try {
+            const res = await fetch(`${API_BASE}/api/document/upload-for-mapping`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                body: formPayload,
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const extractedText = data.extractedText || "(No text extracted)";
+                setDocMappingText(extractedText);
+                setDocMappingDocId(data._id);
+
+                // Auto-map fields using OCR field mappings from settings
+                try {
+                    const settingsRes = await fetch(`${API_BASE}/api/settings`, { headers });
+                    if (settingsRes.ok) {
+                        const settingsData = await settingsRes.json();
+                        const s = Array.isArray(settingsData) ? settingsData[0] : settingsData;
+                        const mappings = s?.ocrFieldMappings || [];
+                        if (mappings.length > 0) {
+                            const mapped: Record<string, string> = {};
+                            const lines = extractedText.split("\n");
+                            for (const line of lines) {
+                                // Match "Label: Value" or "Label = Value" patterns
+                                const match = line.match(/^\s*(.+?)\s*[:=]\s*(.+?)\s*$/);
+                                if (!match) continue;
+                                const docLabel = match[1].trim().toLowerCase();
+                                const docValue = match[2].trim();
+                                for (const m of mappings) {
+                                    const aliases = (m.documentLabels || "").split("|").map((a: string) => a.trim().toLowerCase());
+                                    if (aliases.includes(docLabel) && m.dealField) {
+                                        // Normalize values for specific fields
+                                        if (m.dealField === "paymentFrequency") {
+                                            mapped[m.dealField] = docValue.toLowerCase();
+                                        } else if (m.dealField === "mcaHistory") {
+                                            mapped[m.dealField] = docValue.charAt(0).toUpperCase() + docValue.slice(1);
+                                        } else if (m.dealField === "fundedDate") {
+                                            // Try to parse the date into yyyy-mm-dd format
+                                            const d = new Date(docValue);
+                                            if (!isNaN(d.getTime())) {
+                                                mapped[m.dealField] = d.toISOString().split("T")[0];
+                                            } else {
+                                                mapped[m.dealField] = docValue;
+                                            }
+                                        } else {
+                                            // Strip $ , and % symbols for numeric fields
+                                            mapped[m.dealField] = docValue.replace(/[$,%]/g, "").trim();
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                            setDocMappingFields(mapped);
+                        }
+                    }
+                } catch { /* ignore mapping errors, user can fill manually */ }
+            } else {
+                setDocMappingText("Error uploading/extracting document.");
+            }
+        } catch {
+            setDocMappingText("Error uploading/extracting document.");
+        }
+    };
+
+    const handleCreateDealFromDoc = async () => {
+        if (!selectedCorpId || !docMappingDocId) return;
+        try {
+            // Create the deal with mapped fields
+            const payload: Record<string, unknown> = {
+                corporationId: selectedCorpId,
+                typeOfDeal: "new",
+                officeAcronym: currentUser?.officeAcronym || "",
+                fundedDate: docMappingFields.fundedDate || new Date().toISOString().split("T")[0],
+                fundedAmount: parseFloat(docMappingFields.fundedAmount || "0") || 0,
+                originationFeePercent: parseFloat(docMappingFields.originationFeePercent || "0") || 0,
+                originationFee: parseFloat(docMappingFields.originationFee || "0") || 0,
+                buyRate: parseFloat(docMappingFields.buyRate || "0") || 0,
+                brokerFee: parseFloat(docMappingFields.brokerFee || "0") || 0,
+                loanTerm: parseInt(docMappingFields.loanTerm || "0") || 0,
+                weeklyOrDailyPayment: docMappingFields.paymentFrequency === "weekly",
+                mcaHistory: docMappingFields.mcaHistory || "No",
+                position: docMappingFields.position || "1",
+            };
+
+            const res = await fetch(`${API_BASE}/api/deal`, {
+                method: "POST", headers,
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error("Failed to create deal");
+            const newDeal = await res.json();
+
+            // Link the uploaded document to the new deal
+            await fetch(`${API_BASE}/api/document/${docMappingDocId}/link`, {
+                method: "PUT", headers,
+                body: JSON.stringify({ dealId: newDeal._id }),
+            });
+
+            setShowCreateFromDoc(false);
+            await fetchDeals(selectedCorpId);
+            // Open the new deal for editing
+            const updatedRes = await fetch(`${API_BASE}/api/deal?corporationId=${selectedCorpId}`, { headers });
+            if (updatedRes.ok) {
+                const updatedDeals: DealRecord[] = await updatedRes.json();
+                const created = updatedDeals.find(d => d._id === newDeal._id);
+                if (created) startEdit(created);
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to create deal from document");
+        }
     };
 
     const handleAddPosition = async () => {
@@ -965,6 +1158,10 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         await fetch(`${API_BASE}/api/fee/${fee._id}?dealId=${deal._id}`, { method: "DELETE", headers });
                     }
                 }
+            } catch { /* ignore */ }
+            // Delete all documents for this deal
+            try {
+                await fetch(`${API_BASE}/api/document/deal/${deal._id}`, { method: "DELETE", headers });
             } catch { /* ignore */ }
             const res = await fetch(`${API_BASE}/api/deal/${deal._id}?corporationId=${selectedCorpId}`, {
                 method: "DELETE",
@@ -1836,7 +2033,7 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     compoundExpectedRoi: 0, compoundExpectedRoiOnCapital: 0,
                     compoundCurrentRoi: 0, compoundCurrentRoiOnCapital: 0,
                     totalNetCashOut: 0,
-                    positions: [], expenses: [], fees: [], dealState: "",
+                    positions: [], expenses: [], fees: [], documents: [], dealState: "",
                     renewalDate: formData.renewalDate || "",
                     renewalDealId: editingDeal?.renewalDealId ?? null,
                     parentDealId: editingDeal?.parentDealId ?? renewingParentId,
@@ -2034,6 +2231,49 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                 );
             })()}
 
+            {/* Section: Uploaded Documents */}
+            {editingDeal && (
+            <div className="form-section">
+                <SectionHeader id="documents" title="Uploaded Documents" count={documents.length} rightContent={
+                    <label className="btn btn-sm" style={{ cursor: "pointer", textTransform: "none", letterSpacing: "normal", fontSize: "0.75rem" }}>
+                        Upload Document
+                        <input type="file" style={{ display: "none" }} onChange={(e) => {
+                            if (e.target.files?.[0]) handleUploadDocument(e.target.files[0]);
+                            e.target.value = "";
+                        }} />
+                    </label>
+                } />
+                <table className="dialog-table" style={{ display: isSectionOpen("documents") ? undefined : "none" }}>
+                    <thead><tr>
+                        <th style={{ textAlign: "left" }}>File Name</th>
+                        <th style={{ textAlign: "center" }}>Type</th>
+                        <th style={{ textAlign: "right" }}>Size</th>
+                        <th style={{ textAlign: "center" }}>Upload Date</th>
+                        <th style={{ textAlign: "right" }}>Actions</th>
+                    </tr></thead>
+                    <tbody>
+                        {documents.length === 0 ? (
+                            <tr><td colSpan={5} style={{ textAlign: "center", fontStyle: "italic", color: "#999" }}>No documents uploaded</td></tr>
+                        ) : documents.map(doc => (
+                            <tr key={doc._id}
+                                onDoubleClick={() => handleViewDocument(doc)}
+                                style={{ cursor: "pointer" }}
+                            >
+                                <td style={{ textAlign: "left" }}>{doc.originalName}</td>
+                                <td style={{ textAlign: "center" }}>{doc.mimeType}</td>
+                                <td style={{ textAlign: "right" }}>{doc.fileSize > 1024 * 1024 ? (doc.fileSize / (1024 * 1024)).toFixed(1) + " MB" : (doc.fileSize / 1024).toFixed(1) + " KB"}</td>
+                                <td style={{ textAlign: "center" }}>{new Date(doc.uploadDate).toLocaleDateString()}</td>
+                                <td style={{ textAlign: "right" }}>
+                                    <button className="btn btn-sm btn-success" onClick={() => handleDownloadDocument(doc)}>Download</button>
+                                    <button className="btn btn-sm btn-danger" onClick={() => handleDeleteDocument(doc._id)}>Delete</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            )}
+
             {/* Section 9: Open Positions */}
             <div className="form-section">
                 <SectionHeader id="positions" title="Open Positions" count={positions.length} rightContent={
@@ -2144,6 +2384,14 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                         <button className="btn" onClick={startAdd} disabled={!selectedCorpId || isAdding || showForm}>
                             Add Deal
                         </button>
+                        <button className="btn" disabled={!selectedCorpId || isAdding || showForm}
+                            onClick={() => document.getElementById("create-deal-from-doc-input")?.click()}>
+                            Create Deal from Document
+                        </button>
+                        <input id="create-deal-from-doc-input" type="file" style={{ display: "none" }} onChange={(e) => {
+                            if (e.target.files?.[0]) handleUploadForMapping(e.target.files[0]);
+                            e.target.value = "";
+                        }} />
                     </div>
 
                     {selectedCorpId && (
@@ -2348,6 +2596,77 @@ export default function DealsDlg({ onClose }: DealsDlgProps) {
                     </div>
                     <div className="dialog-footer">
                         <button className="btn" onClick={() => setShowCompoundInfo(false)}>Close</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Create Deal from Document — Split-Panel Mapping Dialog */}
+        {showCreateFromDoc && (
+            <div className="dialog-overlay" style={{ zIndex: 2002 }}>
+                <div className="dialog dialog-extra-wide" style={{ maxWidth: 1100 }}>
+                    <div className="dialog-header">
+                        <h2><img src="/hand-dollar.png" alt="" style={{ height: "40px", width: "auto", marginRight: "8px", verticalAlign: "middle" }} />Create Deal from Document — {docMappingFileName}</h2>
+                        <button className="dialog-close" onClick={() => {
+                            if (docMappingDocId) {
+                                fetch(`${API_BASE}/api/document/${docMappingDocId}`, { method: "DELETE", headers }).catch(() => {});
+                            }
+                            setShowCreateFromDoc(false);
+                        }}>&times;</button>
+                    </div>
+                    <div className="dialog-body" style={{ display: "flex", gap: 16, maxHeight: 550, overflow: "hidden" }}>
+                        {/* Left: Extracted Text */}
+                        <div style={{ flex: 1, overflow: "auto", border: "1px solid #ccc", borderRadius: 4, padding: 12, background: "#fafafa" }}>
+                            <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "#555" }}>Extracted Document Text</h3>
+                            <pre style={{ whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: 12, margin: 0 }}>{docMappingText}</pre>
+                        </div>
+                        {/* Right: Deal Field Mapping */}
+                        <div style={{ flex: 1, overflow: "auto", padding: "0 4px" }}>
+                            <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "#555" }}>Deal Field Mapping</h3>
+                            <p style={{ fontSize: 11, color: "#888", margin: "0 0 12px" }}>
+                                Review the extracted text and enter the values for each deal field. Fields left blank will use defaults.
+                            </p>
+                            {[
+                                { key: "fundedAmount", label: "Funded Amount ($)", type: "text" },
+                                { key: "fundedDate", label: "Funded Date", type: "date" },
+                                { key: "originationFeePercent", label: "Origination Fee (%)", type: "text" },
+                                { key: "originationFee", label: "Origination Fee ($)", type: "text" },
+                                { key: "buyRate", label: "Buy Rate", type: "text" },
+                                { key: "brokerFee", label: "Broker Fee (%)", type: "text" },
+                                { key: "loanTerm", label: "Loan Term (days)", type: "text" },
+                                { key: "paymentFrequency", label: "Payment Frequency", type: "select", options: ["daily", "weekly"] },
+                                { key: "position", label: "Position", type: "text" },
+                                { key: "mcaHistory", label: "MCA History", type: "select", options: ["Yes", "No"] },
+                            ].map(f => (
+                                <div key={f.key} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                                    <label style={{ width: 160, fontSize: 13, fontWeight: 500, textAlign: "right" }}>{f.label}:</label>
+                                    {f.type === "select" ? (
+                                        <select style={{ flex: 1, padding: "4px 6px" }}
+                                            value={docMappingFields[f.key] || ""}
+                                            onChange={(e) => setDocMappingFields(prev => ({ ...prev, [f.key]: e.target.value }))}>
+                                            <option value="">-- Select --</option>
+                                            {f.options?.map(o => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
+                                        </select>
+                                    ) : (
+                                        <input type={f.type} style={{ flex: 1, padding: "4px 6px" }}
+                                            value={docMappingFields[f.key] || ""}
+                                            onChange={(e) => setDocMappingFields(prev => ({ ...prev, [f.key]: e.target.value }))}
+                                        />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="dialog-footer">
+                        <button className="btn btn-primary" onClick={handleCreateDealFromDoc} disabled={!docMappingDocId}>
+                            Create Deal
+                        </button>
+                        <button className="btn" onClick={() => {
+                            if (docMappingDocId) {
+                                fetch(`${API_BASE}/api/document/${docMappingDocId}`, { method: "DELETE", headers }).catch(() => {});
+                            }
+                            setShowCreateFromDoc(false);
+                        }}>Cancel</button>
                     </div>
                 </div>
             </div>

@@ -39,6 +39,12 @@ export interface FeeCategory {
   officeAcronym: string;
 }
 
+export interface OcrFieldMapping {
+  documentLabels: string;    // Pipe-separated aliases
+  dealField: string;         // Target field key
+  fieldLabel: string;        // Human-readable field name
+}
+
 export interface SettingsRecord {
   _id: string;
   guiPaginationValues: number[];
@@ -49,6 +55,7 @@ export interface SettingsRecord {
   userRoles: UserRole[];
   expenseCategories: ExpenseCategory[];
   feeCategories: FeeCategory[];
+  ocrFieldMappings: OcrFieldMapping[];
   dateRecordCreated: string;
   dateRecordLastUpdated: string;
 }

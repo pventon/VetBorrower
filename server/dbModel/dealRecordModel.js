@@ -90,6 +90,9 @@ const dealSchema = new mongoose.Schema({
   expenses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Expenses' }],
   fees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Fees' }],
 
+  // Uploaded documents
+  documents: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Documents' }],
+
   // Deal renewal linking
   renewalDealId: { type: mongoose.Schema.Types.ObjectId, ref: 'Deals', default: null },  // Points to the renewal created from this deal
   parentDealId: { type: mongoose.Schema.Types.ObjectId, ref: 'Deals', default: null },   // Points back to the deal this renewal was created from
